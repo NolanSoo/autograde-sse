@@ -19,11 +19,10 @@
 </head>
 <body>
     <h1>Essay Grader</h1>
-    
+
     <label>Grade Level: <input type="text" id="grade-level" style="width: 100px;"></label>
     <label>Class/Subject: <input type="text" id="class-subject" style="width: 100px;"></label>
-    <button id="create-rubric-btn">Create Rubric</button>
-    
+
     <h2>Rubric</h2>
     <table id="rubric-table">
         <thead>
@@ -31,7 +30,7 @@
                 <th>Final Grade</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody id="rubric-body">
             <tr id="weight-row">
                 <td>Weight (% or Points)</td>
             </tr>
@@ -39,7 +38,9 @@
     </table>
     <button id="add-criteria-btn">Add Criteria</button>
     <button id="remove-criteria-btn">Remove Criteria</button>
-    
+    <button id="add-rubric-row-btn">Add Rubric Row</button>
+    <button id="remove-rubric-row-btn">Remove Rubric Row</button>
+
     <h2>Essays</h2>
     <table id="essay-table">
         <thead>
@@ -53,42 +54,79 @@
     </table>
     <button id="add-row-btn">Add Row</button>
     <button id="remove-row-btn">Remove Row</button>
-    
+
     <script>
         let criteriaCount = 0;
         const rubricTable = document.getElementById('rubric-table');
+        const rubricBody = document.getElementById('rubric-body');
         const weightRow = document.getElementById('weight-row');
         const addCriteriaBtn = document.getElementById('add-criteria-btn');
         const removeCriteriaBtn = document.getElementById('remove-criteria-btn');
+        const addRubricRowBtn = document.getElementById('add-rubric-row-btn');
+        const removeRubricRowBtn = document.getElementById('remove-rubric-row-btn');
         const essayTable = document.getElementById('essay-table');
         const essayBody = document.getElementById('essay-body');
         const addRowBtn = document.getElementById('add-row-btn');
         const removeRowBtn = document.getElementById('remove-row-btn');
-        
+
         addCriteriaBtn.addEventListener('click', addCriteria);
         removeCriteriaBtn.addEventListener('click', removeCriteria);
+        addRubricRowBtn.addEventListener('click', addRubricRow);
+        removeRubricRowBtn.addEventListener('click', removeRubricRow);
         addRowBtn.addEventListener('click', addRow);
         removeRowBtn.addEventListener('click', removeRow);
-        
+
         function addCriteria() {
             criteriaCount++;
             const newTh = document.createElement('th');
             newTh.innerHTML = `<input type="text" placeholder="Criteria ${criteriaCount}" style="width: 100%; border: none; padding: 0;">`;
             rubricTable.tHead.rows[0].appendChild(newTh);
-            
+
             const weightCell = document.createElement('td');
             weightCell.innerHTML = `<input type="text" placeholder="Weight (% or Points)">`;
             weightRow.appendChild(weightCell);
+
+            for (let i = 0; i < rubricBody.rows.length; i++) {
+                if (rubricBody.rows[i].id !== 'weight-row') {
+                    rubricBody.rows[i].appendChild(document.createElement('td'));
+                }
+            }
         }
-        
+
         function removeCriteria() {
             if (criteriaCount > 0) {
                 criteriaCount--;
                 rubricTable.tHead.rows[0].lastChild.remove();
                 weightRow.lastChild.remove();
+
+                for (let i = 0; i < rubricBody.rows.length; i++) {
+                    if (rubricBody.rows[i].id !== 'weight-row') {
+                        rubricBody.rows[i].lastChild.remove();
+                    }
+                }
             }
         }
-        
+
+        function addRubricRow() {
+            const row = document.createElement('tr');
+            for (let i = 0; i <= criteriaCount; i++) {
+                const cell = document.createElement('td');
+                cell.innerHTML = `<input type="text" placeholder="Level description">`;
+                row.appendChild(cell);
+            }
+            rubricBody.insertBefore(row, weightRow);
+        }
+
+        function removeRubricRow() {
+            const rows = rubricBody.querySelectorAll('tr');
+            for (let i = 0; i < rows.length; i++) {
+                if (rows[i].id !== 'weight-row') {
+                    rubricBody.removeChild(rows[i]);
+                    break;
+                }
+            }
+        }
+
         function addRow() {
             const row = document.createElement('tr');
             row.innerHTML = `
@@ -97,7 +135,7 @@
             `;
             essayBody.appendChild(row);
         }
-        
+
         function removeRow() {
             if (essayBody.children.length > 0) {
                 essayBody.lastChild.remove();
