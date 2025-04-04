@@ -1,169 +1,207 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Essay Grader</title>
-    <style>
-        table {
-            border-collapse: collapse;
-            width: 100%;
-            margin-bottom: 20px;
-        }
-        th, td {
-            border: 1px solid black;
-            padding: 10px;
-            text-align: left;
-        }
-        th {
-            background-color: #f0f0f0;
-        }
-        input, textarea {
-            width: 100%;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Essay Grader</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+    }
+    input[type="text"] {
+      width: 100%;
+    }
+    #rubric-table input {
+      width: 90%;
+    }
+  </style>
 </head>
 <body>
-    <h1>Essay Grader</h1>
 
-    <label>Grade Level: <input type="text" id="grade-level"></label>
-    <label>Class/Subject: <input type="text" id="class-subject"></label>
+<h2>Essay Grader</h2>
+<label>Grade Level: <input type="text" id="grade-level"></label>
+<label>Class/Subject: <input type="text" id="class-subject"></label>
 
-    <h2>Rubric</h2>
-    <table id="rubric-table">
-        <thead>
-            <tr>
-                <th>Final Grade</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr id="weight-row">
-                <td><strong>Weight</strong></td>
-            </tr>
-        </tbody>
-    </table>
-    <button id="add-criteria-btn">Add Criteria</button>
-    <button id="remove-criteria-btn">Remove Criteria</button>
-    <button id="add-row-btn">Add Row to Rubric</button>
-    <button id="remove-row-btn">Remove Row from Rubric</button>
+<h3>Rubric</h3>
+<table id="rubric-table">
+  <thead>
+    <tr>
+      <th>Final Grade</th>
+      <th><input type="text" value="Criterion 1" class="criterion-name"></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="weight-row">
+      <td><strong>Weight (% or points)</strong></td>
+      <td><input type="text" class="weight-input"></td>
+    </tr>
+    <tr>
+      <td>Excellent</td>
+      <td><input type="text"></td>
+    </tr>
+    <tr>
+      <td>Good</td>
+      <td><input type="text"></td>
+    </tr>
+    <tr>
+      <td>Needs Improvement</td>
+      <td><input type="text"></td>
+    </tr>
+  </tbody>
+</table>
+<button id="add-criterion">Add Criterion</button>
+<button id="add-rubric-row">Add Rubric Row</button>
 
-    <h2>Essays</h2>
-    <table id="essay-table">
-        <thead>
-            <tr>
-                <th>Student Name</th>
-                <th>Essay</th>
-            </tr>
-        </thead>
-        <tbody id="essay-body">
-        </tbody>
-    </table>
-    <button id="add-essay-btn">Add Essay</button>
-    <button id="remove-essay-btn">Remove Essay</button>
+<h3>Essays</h3>
+<table id="essay-body">
+  <thead>
+    <tr>
+      <th>Student Name</th>
+      <th>Essay</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><input type="text"></td>
+      <td><input type="text"></td>
+    </tr>
+  </tbody>
+</table>
+<button id="add-essay">Add Essay</button>
+<button id="submit-btn">Submit</button>
 
-    <button id="submit-btn">Submit</button>
+<div id="output"></div>
 
-    <script>
-        let criteriaCount = 0;
-        const rubricTable = document.getElementById('rubric-table');
-        const essayTable = document.getElementById('essay-table');
-        const essayBody = document.getElementById('essay-body');
+<script type="module">
+  import Groq from "https://cdn.jsdelivr.net/npm/groq-sdk@0.8.0/+esm";
 
-        document.getElementById('add-criteria-btn').addEventListener('click', function() {
-            criteriaCount++;
-            const newTh = document.createElement('th');
-            newTh.innerHTML = `<input type="text" placeholder="Criteria ${criteriaCount}">`;
-            rubricTable.tHead.rows[0].appendChild(newTh);
+  const encodedApiKey = "Z3NrX21tTzZvWlpXMjdQbkJqTnpyWFVHV0dkeWIzRllsT0Z5TzVBYUtSbldQUGdubkZ5T1hKY2M=";
+  const decodedApiKey = atob(encodedApiKey);
+  const client = new Groq({ apiKey: decodedApiKey, dangerouslyAllowBrowser: true });
 
-            const newWeightTd = document.createElement('td');
-            newWeightTd.innerHTML = `<input type="text" placeholder="Weight (% or pts)">`;
-            document.getElementById('weight-row').appendChild(newWeightTd);
+  const rubricTable = document.getElementById('rubric-table').querySelector('tbody');
+  const addCriterionBtn = document.getElementById('add-criterion');
+  const addRubricRowBtn = document.getElementById('add-rubric-row');
+  const addEssayBtn = document.getElementById('add-essay');
+  const essayTable = document.getElementById('essay-body').querySelector('tbody');
 
-            Array.from(rubricTable.tBodies[0].rows).forEach(row => {
-                if (row.id !== 'weight-row') {
-                    const newTd = document.createElement('td');
-                    newTd.innerHTML = `<input type="text" placeholder="Level description">`;
-                    row.appendChild(newTd);
-                }
-            });
-        });
+  addCriterionBtn.addEventListener('click', () => {
+    const headRow = document.querySelector('#rubric-table thead tr');
+    const newTh = document.createElement('th');
+    const input = document.createElement('input');
+    input.classList.add('criterion-name');
+    input.type = 'text';
+    input.value = `Criterion ${headRow.children.length}`;
+    newTh.appendChild(input);
+    headRow.appendChild(newTh);
 
-        document.getElementById('remove-criteria-btn').addEventListener('click', function() {
-            if (criteriaCount > 0) {
-                rubricTable.tHead.rows[0].lastChild.remove();
-                document.getElementById('weight-row').lastChild.remove();
-                Array.from(rubricTable.tBodies[0].rows).forEach(row => {
-                    if (row.id !== 'weight-row') {
-                        row.lastChild.remove();
-                    }
-                });
-                criteriaCount--;
-            }
-        });
+    rubricTable.querySelectorAll('tr').forEach((row, i) => {
+      const newTd = document.createElement('td');
+      if (i === 0) {
+        const weightInput = document.createElement('input');
+        weightInput.classList.add('weight-input');
+        weightInput.type = 'text';
+        newTd.appendChild(weightInput);
+      } else {
+        const textInput = document.createElement('input');
+        textInput.type = 'text';
+        newTd.appendChild(textInput);
+      }
+      row.appendChild(newTd);
+    });
+  });
 
-        document.getElementById('add-row-btn').addEventListener('click', function() {
-            const newRow = document.createElement('tr');
-            newRow.innerHTML = `<td><input type="text" placeholder="Proficiency Level"></td>`;
-            for (let i = 0; i < criteriaCount; i++) {
-                newRow.innerHTML += `<td><input type="text" placeholder="Level description"></td>`;
-            }
-            rubricTable.tBodies[0].appendChild(newRow);
-        });
+  addRubricRowBtn.addEventListener('click', () => {
+    const row = document.createElement('tr');
+    const tdLabel = document.createElement('td');
+    tdLabel.textContent = `Level ${rubricTable.rows.length}`;
+    row.appendChild(tdLabel);
 
-        document.getElementById('remove-row-btn').addEventListener('click', function() {
-            if (rubricTable.tBodies[0].rows.length > 1) {
-                rubricTable.tBodies[0].lastChild.remove();
-            }
-        });
+    const columnCount = document.querySelector('#rubric-table thead tr').children.length;
+    for (let i = 1; i < columnCount; i++) {
+      const td = document.createElement('td');
+      const input = document.createElement('input');
+      input.type = 'text';
+      td.appendChild(input);
+      row.appendChild(td);
+    }
+    rubricTable.appendChild(row);
+  });
 
-        document.getElementById('add-essay-btn').addEventListener('click', function() {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td><input type="text" placeholder="Student Name"></td>
-                <td><input type="text" placeholder="Essay"></td>
-            `;
-            essayBody.appendChild(row);
-        });
+  addEssayBtn.addEventListener('click', () => {
+    const row = document.createElement('tr');
+    const nameCell = document.createElement('td');
+    const essayCell = document.createElement('td');
+    nameCell.innerHTML = `<input type="text">`;
+    essayCell.innerHTML = `<input type="text">`;
+    row.appendChild(nameCell);
+    row.appendChild(essayCell);
+    essayTable.appendChild(row);
+  });
 
-        document.getElementById('remove-essay-btn').addEventListener('click', function() {
-            if (essayBody.children.length > 0) {
-                essayBody.lastChild.remove();
-            }
-        });
+  document.getElementById('submit-btn').addEventListener('click', async function () {
+    const gradeLevel = document.getElementById('grade-level').value;
+    const subject = document.getElementById('class-subject').value;
+    const rubricInput = document.getElementById('rubric-table').outerHTML;
+    const criteria = Array.from(document.querySelectorAll('.criterion-name')).map(e => e.value);
 
-        document.getElementById('submit-btn').addEventListener('click', function() {
-            const essays = Array.from(document.querySelectorAll('#essay-body tr'));
-            if (essays.length < 15) {
-                alert('Please add at least 15 essays before submitting.');
-                return;
-            }
-            
-            let selectedEssays = [];
-            while (selectedEssays.length < 8) {
-                let randomEssay = essays[Math.floor(Math.random() * essays.length)];
-                if (!selectedEssays.includes(randomEssay)) {
-                    selectedEssays.push(randomEssay);
-                }
-            }
-            
-            selectedEssays.forEach(essay => {
-                const studentName = essay.children[0].querySelector('input').value;
-                const essayText = essay.children[1].querySelector('input').value;
-                
-                let popup = window.open("", "_blank", "width=600,height=400");
-                popup.document.write(`<h2>Grading: ${studentName}</h2>`);
-                popup.document.write(`<p><strong>Essay:</strong> ${essayText}</p>`);
-                popup.document.write(`<label>Final Grade: <input type='text' id='final-grade'></label><br>`);
-                
-                for (let i = 1; i <= criteriaCount; i++) {
-                    popup.document.write(`<label>Criteria ${i}: <input type='text' id='criteria-${i}'></label><br>`);
-                }
-                popup.document.write(`<label>Feedback: <textarea id='feedback'></textarea></label><br>`);
-                popup.document.write(`<button onclick='window.close()'>Save & Close</button>`);
-            });
+    const essays = Array.from(document.querySelectorAll('#essay-body tbody tr'));
+    if (essays.length < 15) {
+      alert('Please add at least 15 essays before submitting.');
+      return;
+    }
 
-            // Later: Send essays and rubric data to Groq AI for automated grading
-        });
-    </script>
+    let selectedEssays = [];
+    while (selectedEssays.length < 8) {
+      let randomEssay = essays[Math.floor(Math.random() * essays.length)];
+      if (!selectedEssays.includes(randomEssay)) {
+        selectedEssays.push(randomEssay);
+      }
+    }
+
+    const promptInput = prompt("Enter the writing prompt:");
+
+    for (const essay of selectedEssays) {
+      const studentName = essay.children[0].querySelector('input').value;
+      const essayText = essay.children[1].querySelector('input').value;
+
+      let systemMessage = `You are an expert essay grader for grade ${gradeLevel} ${subject}. Here is the rubric: ${rubricInput}. Grade the following essay:`;
+      let userMessage = `Essay by ${studentName}: ${essayText}. Use the following format:\n`;
+      userMessage += `Overall Grade: {grade} + {feedback}\n`;
+      criteria.forEach((criterion, index) => {
+        userMessage += `Subgrade ${index + 1}: ${criterion} + {grade} + {feedback}\n`;
+      });
+      userMessage += `Conciseness + {grade} + {feedback}\nConventions + {grade} + {feedback}\nDetail + {grade} + {feedback}\nDescriptions + {grade} + {feedback}`;
+      userMessage += `\nPrompt: ${promptInput}`;
+
+      const params = {
+        messages: [
+          { role: "system", content: systemMessage },
+          { role: "user", content: userMessage }
+        ],
+        model: "llama3-8b-8192"
+      };
+
+      try {
+        const chatCompletion = await client.chat.completions.create(params);
+        const messageContent = chatCompletion.choices[0].message.content;
+        let formattedFeedback = messageContent.replace(/\n\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        const formattedFeedbackFinal = formattedFeedback.trim().split("\n").map(line => line.trim() + "<br>").join("");
+        document.getElementById("output").innerHTML += `<h3>${studentName}'s Feedback:</h3>${formattedFeedbackFinal}<hr>`;
+        console.log("Feedback for", studentName, ":", messageContent);
+      } catch (err) {
+        console.error("Error getting feedback for", studentName, ":", err);
+      }
+    }
+  });
+</script>
 </body>
 </html>
