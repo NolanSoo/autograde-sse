@@ -22,6 +22,39 @@
     #rubric-table input {
       width: 90%;
     }
+    /* Modal styles */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: rgb(0,0,0);
+      background-color: rgba(0,0,0,0.4);
+      padding-top: 60px;
+    }
+    .modal-content {
+      background-color: #fefefe;
+      margin: 5% auto;
+      padding: 20px;
+      border: 1px solid #888;
+      width: 80%;
+    }
+    .close {
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+    }
+    .close:hover,
+    .close:focus {
+      color: black;
+      text-decoration: none;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -45,15 +78,15 @@
     </tr>
     <tr>
       <td>Excellent</td>
-      <td><input type="text"></td>
+      <td><input type="text"> (Max Score: <span class="max-score">10</span>)</td>
     </tr>
     <tr>
       <td>Good</td>
-      <td><input type="text"></td>
+      <td><input type="text"> (Max Score: <span class="max-score">7</span>)</td>
     </tr>
     <tr>
       <td>Needs Improvement</td>
-      <td><input type="text"></td>
+      <td><input type="text"> (Max Score: <span class="max-score">4</span>)</td>
     </tr>
   </tbody>
 </table>
@@ -80,6 +113,25 @@
 
 <div id="output"></div>
 
+<!-- Modal for grading essays -->
+<div id="gradeModal" class="modal">
+  <div class="modal-content">
+    <span class="close">&times;</span>
+    <h3>Grade Essay</h3>
+    <label for="student-name">Student Name:</label>
+    <input type="text" id="student-name" disabled>
+    
+    <label for="overall-grade">Overall Grade:</label>
+    <input type="text" id="overall-grade">
+    
+    <h4>Subgrades:</h4>
+    <div id="subgrades-container"></div>
+    
+    <button id="grade-submit">Submit Grade</button>
+  </div>
+</div>
+
+<!-- Adding script -->
 <script type="module">
   import Groq from "https://cdn.jsdelivr.net/npm/groq-sdk@0.8.0/+esm";
 
@@ -92,6 +144,12 @@
   const addRubricRowBtn = document.getElementById('add-rubric-row');
   const addEssayBtn = document.getElementById('add-essay');
   const essayTable = document.getElementById('essay-body').querySelector('tbody');
+  const gradeModal = document.getElementById("gradeModal");
+  const studentNameInput = document.getElementById("student-name");
+  const overallGradeInput = document.getElementById("overall-grade");
+  const subgradesContainer = document.getElementById("subgrades-container");
+  const closeModal = document.querySelector(".close");
+  const gradeSubmit = document.getElementById("grade-submit");
 
   addCriterionBtn.addEventListener('click', () => {
     const headRow = document.querySelector('#rubric-table thead tr');
@@ -147,6 +205,39 @@
     essayTable.appendChild(row);
   });
 
+  function openGradeModal(selectedEssay) {
+    const studentName = selectedEssay.children[0].querySelector('input').value;
+    studentNameInput.value = studentName;
+
+    subgradesContainer.innerHTML = '';
+    const criteria = Array.from(document.querySelectorAll('.criterion-name'));
+    
+    criteria.forEach((criterion, index) => {
+      const subgradeDiv = document.createElement('div');
+      subgradeDiv.innerHTML = `<label>${criterion.value}</label>: <input type="text" class="subgrade-input" id="subgrade-${index}">`;
+      subgradesContainer.appendChild(subgradeDiv);
+    });
+    
+    gradeModal.style.display = "block";
+  }
+
+  closeModal.onclick = function() {
+    gradeModal.style.display = "none";
+  }
+
+  gradeSubmit.addEventListener('click', async () => {
+    const studentName = studentNameInput.value;
+    const overallGrade = overallGradeInput.value;
+    const subgrades = Array.from(subgradesContainer.querySelectorAll('.subgrade-input')).map(input => input.value);
+    
+    console.log(`Overall Grade for ${studentName}: ${overallGrade}`);
+    subgrades.forEach((subgrade, index) => {
+      console.log(`Subgrade ${index + 1} for ${studentName}: ${subgrade}`);
+    });
+
+    gradeModal.style.display = "none"; // Close modal
+  });
+
   document.getElementById('submit-btn').addEventListener('click', async function () {
     const gradeLevel = document.getElementById('grade-level').value;
     const subject = document.getElementById('class-subject').value;
@@ -164,12 +255,13 @@
       let randomEssay = essays[Math.floor(Math.random() * essays.length)];
       if (!selectedEssays.includes(randomEssay)) {
         selectedEssays.push(randomEssay);
+        openGradeModal(randomEssay);
       }
     }
 
-    const promptInput = prompt("Enter the writing prompt:");
+    const promptInput = document.getElementById("prompt-input").value; // Get prompt input from a text box
 
-    for (const essay of selectedEssays) {
+    for (const essay of essays) {
       const studentName = essay.children[0].querySelector('input').value;
       const essayText = essay.children[1].querySelector('input').value;
 
@@ -193,15 +285,13 @@
       try {
         const chatCompletion = await client.chat.completions.create(params);
         const messageContent = chatCompletion.choices[0].message.content;
-        let formattedFeedback = messageContent.replace(/\n\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        const formattedFeedbackFinal = formattedFeedback.trim().split("\n").map(line => line.trim() + "<br>").join("");
-        document.getElementById("output").innerHTML += `<h3>${studentName}'s Feedback:</h3>${formattedFeedbackFinal}<hr>`;
         console.log("Feedback for", studentName, ":", messageContent);
       } catch (err) {
         console.error("Error getting feedback for", studentName, ":", err);
       }
     }
   });
+
 </script>
 </body>
 </html>
