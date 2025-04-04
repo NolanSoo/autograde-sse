@@ -1,1 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Essay Grader</title>
+    <style>
+        table {
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 10px;
+        }
+        th {
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Essay Grader</h1>
+    <table id="essay-table">
+        <thead>
+            <tr>
+                <th>Student Name</th>
+                <th>Essay</th>
+                <th>Final Grade</th>
+                <th>Feedback</th>
+            </tr>
+        </thead>
+        <tbody id="essay-body">
+        </tbody>
+    </table>
+    <button id="add-row-btn">Add Row</button>
+    <button id="add-subcriteria-btn">Add Subcriteria</button>
+    <button id="remove-subcriteria-btn">Remove Subcriteria</button>
+
+    <script>
+        let subcriteriaCount = 0;
+        const essayTable = document.getElementById('essay-table');
+        const essayBody = document.getElementById('essay-body');
+        const addRowBtn = document.getElementById('add-row-btn');
+        const addSubcriteriaBtn = document.getElementById('add-subcriteria-btn');
+        const removeSubcriteriaBtn = document.getElementById('remove-subcriteria-btn');
+
+        addRowBtn.addEventListener('click', addRow);
+        addSubcriteriaBtn.addEventListener('click', addSubcriteria);
+        removeSubcriteriaBtn.addEventListener('click', removeSubcriteria);
+
+        function addRow() {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><input type="text" placeholder="Student Name"></td>
+                <td><input type="text" placeholder="Essay"></td>
+                <td><input type="number" placeholder="Final Grade"></td>
+                <td><textarea placeholder="Feedback"></textarea></td>
+            `;
+            for (let i = 0; i < subcriteriaCount; i++) {
+                const subcriteriaCell = document.createElement('td');
+                subcriteriaCell.innerHTML = `<input type="number" placeholder="Subcriteria ${i + 1}">`;
+                row.appendChild(subcriteriaCell);
+            }
+            essayBody.appendChild(row);
+        }
+
+        function addSubcriteria() {
+            subcriteriaCount++;
+            const newTh = document.createElement('th');
+            newTh.textContent = `Subcriteria ${subcriteriaCount}`;
+            essayTable.tHead.rows[0].appendChild(newTh);
+            const rows = essayBody.children;
+            for (let i = 0; i < rows.length; i++) {
+                const subcriteriaCell = document.createElement('td');
+                subcriteriaCell.innerHTML = `<input type="number" placeholder="Subcriteria ${subcriteriaCount}">`;
+                rows[i].appendChild(subcriteriaCell);
+            }
+        }
+
+        function removeSubcriteria() {
+            if (subcriteriaCount > 0) {
+                subcriteriaCount--;
+                const ths = essayTable.tHead.rows[0].children;
+                ths[ths.length - 1].remove();
+                const rows = essayBody.children;
+                for (let i = 0; i < rows.length; i++) {
+                    rows[i].removeChild(rows[i].children[rows[i].children.length - 1]);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
 
