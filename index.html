@@ -77,20 +77,21 @@
       <td><input type="text" class="weight-input"></td>
     </tr>
     <tr>
-      <td>Excellent</td>
-      <td><input type="text"> (Max Score: <span class="max-score">10</span>)</td>
+      <td><input type="text" value="Excellent" class="level-name"></td>
+      <td><input type="text"></td>
     </tr>
     <tr>
-      <td>Good</td>
-      <td><input type="text"> (Max Score: <span class="max-score">7</span>)</td>
+      <td><input type="text" value="Good" class="level-name"></td>
+      <td><input type="text"></td>
     </tr>
     <tr>
-      <td>Needs Improvement</td>
-      <td><input type="text"> (Max Score: <span class="max-score">4</span>)</td>
+      <td><input type="text" value="Needs Improvement" class="level-name"></td>
+      <td><input type="text"></td>
     </tr>
   </tbody>
 </table>
 <button id="add-criterion">Add Criterion</button>
+<button id="remove-criterion">Remove Criterion</button>
 <button id="add-rubric-row">Add Rubric Row</button>
 
 <h3>Essays</h3>
@@ -131,7 +132,6 @@
   </div>
 </div>
 
-<!-- Adding script -->
 <script type="module">
   import Groq from "https://cdn.jsdelivr.net/npm/groq-sdk@0.8.0/+esm";
 
@@ -141,6 +141,7 @@
 
   const rubricTable = document.getElementById('rubric-table').querySelector('tbody');
   const addCriterionBtn = document.getElementById('add-criterion');
+  const removeCriterionBtn = document.getElementById('remove-criterion');
   const addRubricRowBtn = document.getElementById('add-rubric-row');
   const addEssayBtn = document.getElementById('add-essay');
   const essayTable = document.getElementById('essay-body').querySelector('tbody');
@@ -163,24 +164,30 @@
 
     rubricTable.querySelectorAll('tr').forEach((row, i) => {
       const newTd = document.createElement('td');
-      if (i === 0) {
-        const weightInput = document.createElement('input');
-        weightInput.classList.add('weight-input');
-        weightInput.type = 'text';
-        newTd.appendChild(weightInput);
-      } else {
-        const textInput = document.createElement('input');
-        textInput.type = 'text';
-        newTd.appendChild(textInput);
-      }
+      const textInput = document.createElement('input');
+      textInput.type = 'text';
+      newTd.appendChild(textInput);
       row.appendChild(newTd);
     });
+  });
+
+  removeCriterionBtn.addEventListener('click', () => {
+    const headRow = document.querySelector('#rubric-table thead tr');
+    const columnCount = headRow.children.length;
+    for (let i = 1; i < columnCount; i++) {
+      headRow.removeChild(headRow.lastElementChild);
+      rubricTable.querySelectorAll('tr').forEach(row => {
+        row.removeChild(row.lastElementChild);
+      });
+    }
   });
 
   addRubricRowBtn.addEventListener('click', () => {
     const row = document.createElement('tr');
     const tdLabel = document.createElement('td');
-    tdLabel.textContent = `Level ${rubricTable.rows.length}`;
+    const inputText = document.createElement('input');
+    inputText.type = 'text'; // Allow renaming
+    tdLabel.appendChild(inputText);
     row.appendChild(tdLabel);
 
     const columnCount = document.querySelector('#rubric-table thead tr').children.length;
@@ -245,8 +252,14 @@
     const criteria = Array.from(document.querySelectorAll('.criterion-name')).map(e => e.value);
 
     const essays = Array.from(document.querySelectorAll('#essay-body tbody tr'));
-    if (essays.length < 15) {
-      alert('Please add at least 15 essays before submitting.');
+    if (essays.length < 5) {
+      alert('Please add at least 5 essays before submitting.');
+      return;
+    }
+
+    if (essays.length <= 8) {
+      alert('You have 8 or fewer essays. You will need to provide grades for all essays yourself.');
+      essays.forEach(essay => openGradeModal(essay));
       return;
     }
 
@@ -259,8 +272,9 @@
       }
     }
 
-    const promptInput = document.getElementById("prompt-input").value; // Get prompt input from a text box
+    const promptInput = prompt("Enter the writing prompt:");
 
+    // Simulate automatic grading for the other essays
     for (const essay of essays) {
       const studentName = essay.children[0].querySelector('input').value;
       const essayText = essay.children[1].querySelector('input').value;
@@ -291,7 +305,6 @@
       }
     }
   });
-
 </script>
 </body>
 </html>
