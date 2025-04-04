@@ -268,7 +268,7 @@
         }
     });
 
-    async function gradeWithGroq(promptInput, overallGrade, subgrades) {
+    async function gradeWithGroq(promptInput, userOverallGrade, userSubgrades) {
         const gradeLevel = document.getElementById('grade-level').value;
         const subject = document.getElementById('class-subject').value;
         const rubricInput = document.getElementById('rubric-table').outerHTML;
@@ -296,46 +296,80 @@
                 model: "llama3-8b-8192"
             };
 
-            // Get Groq's grading results
-            try {
-                const chatCompletion = await client.chat.completions.create(params);
-                const messageContent = chatCompletion.choices[0].message.content;
+            // Retry logic for Groq requests to handle rate limits
+            let retries = 3;
+            let groqGrades;
+            while (retries > 0) {
+                try {
+                    console.log(`Sending request for ${studentName} with message:`, userMessage);
+                    const chatCompletion = await client.chat.completions.create(params);
+                    const messageContent = chatCompletion.choices[0].message.content;
 
-                // Assuming you will extract the grades correctly from the message content
-                const groqGrades = extractGroqGrades(messageContent); // Implement this function based on actual response
+                    // Log Groq's grades and feedback
+                    console.log("Received feedback from Groq for", studentName, ":", messageContent);
 
-                // Log both teacher's and Groq's grades
-                console.log(`Grades for ${studentName}:`);
-                console.log(`User Overall Grade: ${overallGrade}, Groq Overall Grade: ${groqGrades.overall}`);
-                for (let i = 0; i < criteria.length; i++) {
-                    console.log(`User Subgrade ${i + 1}: ${subgrades[i]}, Groq Subgrade ${i + 1}: ${groqGrades.subgrades[i]}`);
-                    console.log(`Subgrade ${i + 1} Difference: ${subgrades[i] - groqGrades.subgrades[i]}`);
+                    // Extract the grades from the response
+                    groqGrades = extractGroqGrades(messageContent);
+
+                    // Log the grades comparison
+                    logGradingDetails(userOverallGrade, userSubgrades, groqGrades, studentName);
+                    break; // Break out of retry loop on success
+                } catch (err) {
+                    if (err.message.includes("429") && retries > 0) {
+                        console.warn("Rate limit exceeded. Retrying...");
+                        retries--;
+                        const backoffTime = 2500; // Wait time before retrying
+                        await new Promise(resolve => setTimeout(resolve, backoffTime));
+                    } else {
+                        console.error("Error getting feedback for", studentName, ":", err);
+                        break; // Exit the retry loop if it's not a rate limit error
+                    }
                 }
+            }
 
-            } catch (err) {
-                console.error("Error getting feedback for", studentName, ":", err);
+            // If retries run out, optionally log an error
+            if (!groqGrades) {
+                console.error(`Failed to receive grades for ${studentName} after multiple retries.`);
             }
         }
     }
 
     function extractGroqGrades(messageContent) {
-        // Placeholder for actual extraction logic
-        const groqGrades = {
-            overall: 0, // Extract actual values based on your logic
-            subgrades: [] // Extract subgrades as an array
+        // Assuming the format returned looks like this:
+        // {
+        //   "overall": 8,
+        //   "subgrades": [7, 6]
+        //   "feedback": "..."
+        // }
+        
+        // This should ideally reflect how you expect the output from Groq
+        let groqGrades = {
+            overall: 0,
+            subgrades: [],
+            feedback: ""
         };
 
-        // Example extraction code (you will need to adapt this):
-        // const lines = messageContent.split("\n");
-        // groqGrades.overall = parseInt(lines[0].match(/Overall Grade: (\d+)/)[1]);
-        // lines.slice(1).forEach((line, index) => {
-        //     const match = line.match(/Subgrade (\d+): (\d+)/);
-        //     if (match) {
-        //         groqGrades.subgrades[parseInt(match[1]) - 1] = parseInt(match[2]);
-        //     }
-        // });
+        // Parse the returned messageContent to extract grades
+        try {
+            const response = JSON.parse(messageContent); // Adjust based on actual response format
+            groqGrades.overall = response.overall;
+            groqGrades.subgrades = response.subgrades;
+            groqGrades.feedback = response.feedback;
+        } catch (e) {
+            console.error("Failed to parse Groq response:", e);
+        }
+        
+        return groqGrades;
+    }
 
-        return groqGrades; // Adjust as needed
+    function logGradingDetails(userOverallGrade, userSubgrades, groqGrades, studentName) {
+        console.log(`Grades for ${studentName}:`);
+        console.log(`User Overall Grade: ${userOverallGrade}, Groq Overall Grade: ${groqGrades.overall}`);
+        for (let i = 0; i < userSubgrades.length; i++) {
+            console.log(`User Subgrade ${i + 1}: ${userSubgrades[i]}, Groq Subgrade ${i + 1}: ${groqGrades.subgrades[i]}`);
+            console.log(`Subgrade ${i + 1} Difference: ${userSubgrades[i] - groqGrades.subgrades[i]}`);
+        }
+        console.log(`Groq Feedback: ${groqGrades.feedback}`);
     }
 
     document.getElementById('submit-btn').addEventListener('click', async function () {
