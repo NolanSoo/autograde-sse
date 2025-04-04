@@ -32,6 +32,7 @@
         </tbody>
     </table>
     <button id="add-row-btn">Add Row</button>
+    <button id="remove-row-btn">Remove Row</button>
     <button id="add-subcriteria-btn">Add Subcriteria</button>
     <button id="remove-subcriteria-btn">Remove Subcriteria</button>
 
@@ -40,10 +41,12 @@
         const essayTable = document.getElementById('essay-table');
         const essayBody = document.getElementById('essay-body');
         const addRowBtn = document.getElementById('add-row-btn');
+        const removeRowBtn = document.getElementById('remove-row-btn');
         const addSubcriteriaBtn = document.getElementById('add-subcriteria-btn');
         const removeSubcriteriaBtn = document.getElementById('remove-subcriteria-btn');
 
         addRowBtn.addEventListener('click', addRow);
+        removeRowBtn.addEventListener('click', removeRow);
         addSubcriteriaBtn.addEventListener('click', addSubcriteria);
         removeSubcriteriaBtn.addEventListener('click', removeSubcriteria);
 
@@ -63,10 +66,17 @@
             essayBody.appendChild(row);
         }
 
+        function removeRow() {
+            const rows = essayBody.children;
+            if (rows.length > 0) {
+                rows[rows.length - 1].remove();
+            }
+        }
+
         function addSubcriteria() {
             subcriteriaCount++;
             const newTh = document.createElement('th');
-            newTh.textContent = `Subcriteria ${subcriteriaCount}`;
+            newTh.innerHTML = `<input type="text" placeholder="Subcriteria ${subcriteriaCount}" style="width: 100%; height: 100%; border: none; padding: 0;">`;
             essayTable.tHead.rows[0].appendChild(newTh);
             const rows = essayBody.children;
             for (let i = 0; i < rows.length; i++) {
@@ -90,4 +100,3 @@
     </script>
 </body>
 </html>
-
