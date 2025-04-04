@@ -152,6 +152,8 @@
   const closeModal = document.querySelector(".close");
   const gradeSubmit = document.getElementById("grade-submit");
 
+  let essayCount = 0;
+
   addCriterionBtn.addEventListener('click', () => {
     const headRow = document.querySelector('#rubric-table thead tr');
     const newTh = document.createElement('th');
@@ -210,6 +212,7 @@
     row.appendChild(nameCell);
     row.appendChild(essayCell);
     essayTable.appendChild(row);
+    essayCount++; // Increment the essay count
   });
 
   function openGradeModal(selectedEssay) {
@@ -237,13 +240,65 @@
     const overallGrade = overallGradeInput.value;
     const subgrades = Array.from(subgradesContainer.querySelectorAll('.subgrade-input')).map(input => input.value);
     
+    // Log teacher's grades and feedback
     console.log(`Overall Grade for ${studentName}: ${overallGrade}`);
     subgrades.forEach((subgrade, index) => {
       console.log(`Subgrade ${index + 1} for ${studentName}: ${subgrade}`);
     });
 
-    gradeModal.style.display = "none"; // Close modal
+    // After grading, close the modal
+    gradeModal.style.display = "none";
+
+    // After closing the modal, check if we've graded 8 essays
+    if (selectedEssays.length < 8 && essayCount >= 8) {
+      openGradeModal(selectedEssays.shift()); // Open for next essay
+    } else if (selectedEssays.length >= 8) {
+      // Perform Groq grading for all graded essays
+      for (const essay of selectedEssays) {
+        const studentName = essay.children[0].querySelector('input').value;
+        const essayText = essay.children[1].querySelector('input').value;
+
+        let systemMessage = `You are an expert essay grader for grade ${gradeLevel} ${subject}. Here is the rubric: ${rubricInput}. Grade the following essay:`;
+        let userMessage = `Essay by ${studentName}: ${essayText}. Use the following format:\n`;
+        userMessage += `Overall Grade: {grade} + {feedback}\n`;
+        criteria.forEach((criterion, index) => {
+          userMessage += `Subgrade ${index + 1}: ${criterion} + {grade} + {feedback}\n`;
+        });
+        userMessage += `Conciseness + {grade} + {feedback}\nConventions + {grade} + {feedback}\nDetail + {grade} + {feedback}\nDescriptions + {grade} + {feedback}`;
+        userMessage += `\nPrompt: ${promptInput}`;
+
+        const params = {
+          messages: [
+            { role: "system", content: systemMessage },
+            { role: "user", content: userMessage }
+          ],
+          model: "llama3-8b-8192"
+        };
+
+        try {
+          const chatCompletion = await client.chat.completions.create(params);
+          const messageContent = chatCompletion.choices[0].message.content;
+
+          console.log("Feedback from Groq for", studentName, ":", messageContent);
+          
+          // Assuming Groq returns a structure for grades (you will need to adjust based on actual API response)
+          const groqGrades = extractGroqGrades(messageContent); // You'll need to define how to extract these grades
+          logGradeDifferences(overallGrade, subgrades, groqGrades); // For example's sake
+        } catch (err) {
+          console.error("Error getting feedback for", studentName, ":", err);
+        }
+      }
+    }
   });
+
+  function logGradeDifferences(teacherGrade, teacherSubgrades, groqGrades) {
+    // Assuming both grades are in a consistent format (number)
+    console.log(`Differences for ${studentName}:`);
+    console.log(`Overall Grade Difference: ${teacherGrade - groqGrades.overall}`);
+    teacherSubgrades.forEach((subgrade, index) => {
+      console.log(`Subgrade ${index + 1} Difference: ${subgrade - groqGrades.subgrades[index]}`);
+    });
+  }
 
   document.getElementById('submit-btn').addEventListener('click', async function () {
     const gradeLevel = document.getElementById('grade-level').value;
@@ -252,58 +307,16 @@
     const criteria = Array.from(document.querySelectorAll('.criterion-name')).map(e => e.value);
 
     const essays = Array.from(document.querySelectorAll('#essay-body tbody tr'));
-    if (essays.length < 5) {
-      alert('Please add at least 5 essays before submitting.');
+    if (essays.length < 8) {
+      alert('Please add at least 8 essays before submitting.');
       return;
     }
 
-    if (essays.length <= 8) {
-      alert('You have 8 or fewer essays. You will need to provide grades for all essays yourself.');
-      essays.forEach(essay => openGradeModal(essay));
-      return;
-    }
+    // Initialize the array for selected essays
+    let selectedEssays = [...essays];
 
-    let selectedEssays = [];
-    while (selectedEssays.length < 8) {
-      let randomEssay = essays[Math.floor(Math.random() * essays.length)];
-      if (!selectedEssays.includes(randomEssay)) {
-        selectedEssays.push(randomEssay);
-        openGradeModal(randomEssay);
-      }
-    }
-
-    const promptInput = prompt("Enter the writing prompt:");
-
-    // Simulate automatic grading for the other essays
-    for (const essay of essays) {
-      const studentName = essay.children[0].querySelector('input').value;
-      const essayText = essay.children[1].querySelector('input').value;
-
-      let systemMessage = `You are an expert essay grader for grade ${gradeLevel} ${subject}. Here is the rubric: ${rubricInput}. Grade the following essay:`;
-      let userMessage = `Essay by ${studentName}: ${essayText}. Use the following format:\n`;
-      userMessage += `Overall Grade: {grade} + {feedback}\n`;
-      criteria.forEach((criterion, index) => {
-        userMessage += `Subgrade ${index + 1}: ${criterion} + {grade} + {feedback}\n`;
-      });
-      userMessage += `Conciseness + {grade} + {feedback}\nConventions + {grade} + {feedback}\nDetail + {grade} + {feedback}\nDescriptions + {grade} + {feedback}`;
-      userMessage += `\nPrompt: ${promptInput}`;
-
-      const params = {
-        messages: [
-          { role: "system", content: systemMessage },
-          { role: "user", content: userMessage }
-        ],
-        model: "llama3-8b-8192"
-      };
-
-      try {
-        const chatCompletion = await client.chat.completions.create(params);
-        const messageContent = chatCompletion.choices[0].message.content;
-        console.log("Feedback for", studentName, ":", messageContent);
-      } catch (err) {
-        console.error("Error getting feedback for", studentName, ":", err);
-      }
-    }
+    // Open modal for the first selected essay
+    openGradeModal(selectedEssays.shift());
   });
 </script>
 </body>
