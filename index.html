@@ -152,7 +152,7 @@
   const closeModal = document.querySelector(".close");
   const gradeSubmit = document.getElementById("grade-submit");
 
-  let essayCount = 0;
+  let selectedEssays = []; // Declare selectedEssays at the top-level
 
   addCriterionBtn.addEventListener('click', () => {
     const headRow = document.querySelector('#rubric-table thead tr');
@@ -212,7 +212,6 @@
     row.appendChild(nameCell);
     row.appendChild(essayCell);
     essayTable.appendChild(row);
-    essayCount++; // Increment the essay count
   });
 
   function openGradeModal(selectedEssay) {
@@ -240,60 +239,71 @@
     const overallGrade = overallGradeInput.value;
     const subgrades = Array.from(subgradesContainer.querySelectorAll('.subgrade-input')).map(input => input.value);
     
-    // Log teacher's grades and feedback
     console.log(`Overall Grade for ${studentName}: ${overallGrade}`);
     subgrades.forEach((subgrade, index) => {
       console.log(`Subgrade ${index + 1} for ${studentName}: ${subgrade}`);
     });
 
-    // After grading, close the modal
+    // Close the modal
     gradeModal.style.display = "none";
 
     // After closing the modal, check if we've graded 8 essays
-    if (selectedEssays.length < 8 && essayCount >= 8) {
-      openGradeModal(selectedEssays.shift()); // Open for next essay
-    } else if (selectedEssays.length >= 8) {
-      // Perform Groq grading for all graded essays
-      for (const essay of selectedEssays) {
-        const studentName = essay.children[0].querySelector('input').value;
-        const essayText = essay.children[1].querySelector('input').value;
-
-        let systemMessage = `You are an expert essay grader for grade ${gradeLevel} ${subject}. Here is the rubric: ${rubricInput}. Grade the following essay:`;
-        let userMessage = `Essay by ${studentName}: ${essayText}. Use the following format:\n`;
-        userMessage += `Overall Grade: {grade} + {feedback}\n`;
-        criteria.forEach((criterion, index) => {
-          userMessage += `Subgrade ${index + 1}: ${criterion} + {grade} + {feedback}\n`;
-        });
-        userMessage += `Conciseness + {grade} + {feedback}\nConventions + {grade} + {feedback}\nDetail + {grade} + {feedback}\nDescriptions + {grade} + {feedback}`;
-        userMessage += `\nPrompt: ${promptInput}`;
-
-        const params = {
-          messages: [
-            { role: "system", content: systemMessage },
-            { role: "user", content: userMessage }
-          ],
-          model: "llama3-8b-8192"
-        };
-
-        try {
-          const chatCompletion = await client.chat.completions.create(params);
-          const messageContent = chatCompletion.choices[0].message.content;
-
-          console.log("Feedback from Groq for", studentName, ":", messageContent);
-          
-          // Assuming Groq returns a structure for grades (you will need to adjust based on actual API response)
-          const groqGrades = extractGroqGrades(messageContent); // You'll need to define how to extract these grades
-          logGradeDifferences(overallGrade, subgrades, groqGrades); // For example's sake
-        } catch (err) {
-          console.error("Error getting feedback for", studentName, ":", err);
-        }
-      }
+    if (selectedEssays.length > 0) {
+      const nextEssay = selectedEssays.shift(); // Pop the next essay from the list
+      openGradeModal(nextEssay); // Open for the next essay
+    } else {
+      // All essays graded, log Groq grading results
+      await gradeWithGroq();
     }
   });
 
-  function logGradeDifferences(teacherGrade, teacherSubgrades, groqGrades) {
-    // Assuming both grades are in a consistent format (number)
-    console.log(`Differences for ${studentName}:`);
+  async function gradeWithGroq() {
+    const gradeLevel = document.getElementById('grade-level').value;
+    const subject = document.getElementById('class-subject').value;
+    const rubricInput = document.getElementById('rubric-table').outerHTML;
+    const criteria = Array.from(document.querySelectorAll('.criterion-name')).map(e => e.value);
+    const essays = Array.from(document.querySelectorAll('#essay-body tbody tr'));
+
+    for (const essay of essays) {
+      const studentName = essay.children[0].querySelector('input').value;
+      const essayText = essay.children[1].querySelector('input').value;
+
+      let systemMessage = `You are an expert essay grader for grade ${gradeLevel} ${subject}. Here is the rubric: ${rubricInput}. Grade the following essay:`;
+      let userMessage = `Essay by ${studentName}: ${essayText}. Use the following format:\n`;
+      userMessage += `Overall Grade: {grade} + {feedback}\n`;
+      criteria.forEach((criterion, index) => {
+        userMessage += `Subgrade ${index + 1}: ${criterion} + {grade} + {feedback}\n`;
+      });
+      userMessage += `Conciseness + {grade} + {feedback}\nConventions + {grade} + {feedback}\nDetail + {grade} + {feedback}\nDescriptions + {grade} + {feedback}`;
+      
+      const params = {
+        messages: [
+          { role: "system", content: systemMessage },
+          { role: "user", content: userMessage }
+        ],
+        model: "llama3-8b-8192"
+      };
+
+      // Get Groq's grading results
+      try {
+        const chatCompletion = await client.chat.completions.create(params);
+        const messageContent = chatCompletion.choices[0].message.content;
+
+        console.log("Feedback from Groq for", studentName, ":", messageContent);
+        
+        // Here we should extract Groq's grades from the message content
+        const groqGrades = {}; // Define how to extract these grades
+        // Assume the extracted grades are stored in groqGrades object
+        logGradingDifferences(overallGrade, subgrades, groqGrades); // You need to implement this
+      } catch (err) {
+        console.error("Error getting feedback for", studentName, ":", err);
+      }
+    }
+  }
+
+  function logGradingDifferences(teacherGrade, teacherSubgrades, groqGrades) {
+    // Assuming groqGrades holds the structure similar to { overall, subgrades: [] }
+    console.log(`Differences for each essay:`);
     console.log(`Overall Grade Difference: ${teacherGrade - groqGrades.overall}`);
     teacherSubgrades.forEach((subgrade, index) => {
       console.log(`Subgrade ${index + 1} Difference: ${subgrade - groqGrades.subgrades[index]}`);
@@ -301,22 +311,14 @@
   }
 
   document.getElementById('submit-btn').addEventListener('click', async function () {
-    const gradeLevel = document.getElementById('grade-level').value;
-    const subject = document.getElementById('class-subject').value;
-    const rubricInput = document.getElementById('rubric-table').outerHTML;
-    const criteria = Array.from(document.querySelectorAll('.criterion-name')).map(e => e.value);
-
     const essays = Array.from(document.querySelectorAll('#essay-body tbody tr'));
     if (essays.length < 8) {
       alert('Please add at least 8 essays before submitting.');
       return;
     }
 
-    // Initialize the array for selected essays
-    let selectedEssays = [...essays];
-
-    // Open modal for the first selected essay
-    openGradeModal(selectedEssays.shift());
+    selectedEssays = [...essays]; // Assign to the global selectedEssays array
+    openGradeModal(selectedEssays.shift()); // Open for the first selected essay
   });
 </script>
 </body>
