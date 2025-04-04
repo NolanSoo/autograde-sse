@@ -19,13 +19,33 @@
 </head>
 <body>
     <h1>Essay Grader</h1>
+    
+    <label>Grade Level: <input type="text" id="grade-level" style="width: 100px;"></label>
+    <label>Class/Subject: <input type="text" id="class-subject" style="width: 100px;"></label>
+    <button id="create-rubric-btn">Create Rubric</button>
+    
+    <h2>Rubric</h2>
+    <table id="rubric-table">
+        <thead>
+            <tr>
+                <th>Final Grade</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr id="weight-row">
+                <td>Weight (% or Points)</td>
+            </tr>
+        </tbody>
+    </table>
+    <button id="add-criteria-btn">Add Criteria</button>
+    <button id="remove-criteria-btn">Remove Criteria</button>
+    
+    <h2>Essays</h2>
     <table id="essay-table">
         <thead>
             <tr>
                 <th>Student Name</th>
                 <th>Essay</th>
-                <th>Final Grade</th>
-                <th>Feedback</th>
             </tr>
         </thead>
         <tbody id="essay-body">
@@ -33,68 +53,54 @@
     </table>
     <button id="add-row-btn">Add Row</button>
     <button id="remove-row-btn">Remove Row</button>
-    <button id="add-subcriteria-btn">Add Subcriteria</button>
-    <button id="remove-subcriteria-btn">Remove Subcriteria</button>
-
+    
     <script>
-        let subcriteriaCount = 0;
+        let criteriaCount = 0;
+        const rubricTable = document.getElementById('rubric-table');
+        const weightRow = document.getElementById('weight-row');
+        const addCriteriaBtn = document.getElementById('add-criteria-btn');
+        const removeCriteriaBtn = document.getElementById('remove-criteria-btn');
         const essayTable = document.getElementById('essay-table');
         const essayBody = document.getElementById('essay-body');
         const addRowBtn = document.getElementById('add-row-btn');
         const removeRowBtn = document.getElementById('remove-row-btn');
-        const addSubcriteriaBtn = document.getElementById('add-subcriteria-btn');
-        const removeSubcriteriaBtn = document.getElementById('remove-subcriteria-btn');
-
+        
+        addCriteriaBtn.addEventListener('click', addCriteria);
+        removeCriteriaBtn.addEventListener('click', removeCriteria);
         addRowBtn.addEventListener('click', addRow);
         removeRowBtn.addEventListener('click', removeRow);
-        addSubcriteriaBtn.addEventListener('click', addSubcriteria);
-        removeSubcriteriaBtn.addEventListener('click', removeSubcriteria);
-
+        
+        function addCriteria() {
+            criteriaCount++;
+            const newTh = document.createElement('th');
+            newTh.innerHTML = `<input type="text" placeholder="Criteria ${criteriaCount}" style="width: 100%; border: none; padding: 0;">`;
+            rubricTable.tHead.rows[0].appendChild(newTh);
+            
+            const weightCell = document.createElement('td');
+            weightCell.innerHTML = `<input type="text" placeholder="Weight (% or Points)">`;
+            weightRow.appendChild(weightCell);
+        }
+        
+        function removeCriteria() {
+            if (criteriaCount > 0) {
+                criteriaCount--;
+                rubricTable.tHead.rows[0].lastChild.remove();
+                weightRow.lastChild.remove();
+            }
+        }
+        
         function addRow() {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td><input type="text" placeholder="Student Name"></td>
                 <td><input type="text" placeholder="Essay"></td>
-                <td><input type="number" placeholder="Final Grade"></td>
-                <td><textarea placeholder="Feedback"></textarea></td>
             `;
-            for (let i = 0; i < subcriteriaCount; i++) {
-                const subcriteriaCell = document.createElement('td');
-                subcriteriaCell.innerHTML = `<input type="number" placeholder="Subcriteria ${i + 1}">`;
-                row.appendChild(subcriteriaCell);
-            }
             essayBody.appendChild(row);
         }
-
+        
         function removeRow() {
-            const rows = essayBody.children;
-            if (rows.length > 0) {
-                rows[rows.length - 1].remove();
-            }
-        }
-
-        function addSubcriteria() {
-            subcriteriaCount++;
-            const newTh = document.createElement('th');
-            newTh.innerHTML = `<input type="text" placeholder="Subcriteria ${subcriteriaCount}" style="width: 100%; height: 100%; border: none; padding: 0;">`;
-            essayTable.tHead.rows[0].appendChild(newTh);
-            const rows = essayBody.children;
-            for (let i = 0; i < rows.length; i++) {
-                const subcriteriaCell = document.createElement('td');
-                subcriteriaCell.innerHTML = `<input type="number" placeholder="Subcriteria ${subcriteriaCount}">`;
-                rows[i].appendChild(subcriteriaCell);
-            }
-        }
-
-        function removeSubcriteria() {
-            if (subcriteriaCount > 0) {
-                subcriteriaCount--;
-                const ths = essayTable.tHead.rows[0].children;
-                ths[ths.length - 1].remove();
-                const rows = essayBody.children;
-                for (let i = 0; i < rows.length; i++) {
-                    rows[i].removeChild(rows[i].children[rows[i].children.length - 1]);
-                }
+            if (essayBody.children.length > 0) {
+                essayBody.lastChild.remove();
             }
         }
     </script>
