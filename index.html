@@ -7,21 +7,27 @@
     <style>
         table {
             border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 20px;
         }
         th, td {
             border: 1px solid black;
             padding: 10px;
+            text-align: left;
         }
         th {
             background-color: #f0f0f0;
+        }
+        input, textarea {
+            width: 100%;
         }
     </style>
 </head>
 <body>
     <h1>Essay Grader</h1>
 
-    <label>Grade Level: <input type="text" id="grade-level" style="width: 100px;"></label>
-    <label>Class/Subject: <input type="text" id="class-subject" style="width: 100px;"></label>
+    <label>Grade Level: <input type="text" id="grade-level"></label>
+    <label>Class/Subject: <input type="text" id="class-subject"></label>
 
     <h2>Rubric</h2>
     <table id="rubric-table">
@@ -30,16 +36,16 @@
                 <th>Final Grade</th>
             </tr>
         </thead>
-        <tbody id="rubric-body">
+        <tbody>
             <tr id="weight-row">
-                <td>Weight (% or Points)</td>
+                <td><strong>Weight</strong></td>
             </tr>
         </tbody>
     </table>
     <button id="add-criteria-btn">Add Criteria</button>
     <button id="remove-criteria-btn">Remove Criteria</button>
-    <button id="add-rubric-row-btn">Add Rubric Row</button>
-    <button id="remove-rubric-row-btn">Remove Rubric Row</button>
+    <button id="add-row-btn">Add Row to Rubric</button>
+    <button id="remove-row-btn">Remove Row from Rubric</button>
 
     <h2>Essays</h2>
     <table id="essay-table">
@@ -52,95 +58,112 @@
         <tbody id="essay-body">
         </tbody>
     </table>
-    <button id="add-row-btn">Add Row</button>
-    <button id="remove-row-btn">Remove Row</button>
+    <button id="add-essay-btn">Add Essay</button>
+    <button id="remove-essay-btn">Remove Essay</button>
+
+    <button id="submit-btn">Submit</button>
 
     <script>
         let criteriaCount = 0;
         const rubricTable = document.getElementById('rubric-table');
-        const rubricBody = document.getElementById('rubric-body');
-        const weightRow = document.getElementById('weight-row');
-        const addCriteriaBtn = document.getElementById('add-criteria-btn');
-        const removeCriteriaBtn = document.getElementById('remove-criteria-btn');
-        const addRubricRowBtn = document.getElementById('add-rubric-row-btn');
-        const removeRubricRowBtn = document.getElementById('remove-rubric-row-btn');
         const essayTable = document.getElementById('essay-table');
         const essayBody = document.getElementById('essay-body');
-        const addRowBtn = document.getElementById('add-row-btn');
-        const removeRowBtn = document.getElementById('remove-row-btn');
 
-        addCriteriaBtn.addEventListener('click', addCriteria);
-        removeCriteriaBtn.addEventListener('click', removeCriteria);
-        addRubricRowBtn.addEventListener('click', addRubricRow);
-        removeRubricRowBtn.addEventListener('click', removeRubricRow);
-        addRowBtn.addEventListener('click', addRow);
-        removeRowBtn.addEventListener('click', removeRow);
-
-        function addCriteria() {
+        document.getElementById('add-criteria-btn').addEventListener('click', function() {
             criteriaCount++;
             const newTh = document.createElement('th');
-            newTh.innerHTML = `<input type="text" placeholder="Criteria ${criteriaCount}" style="width: 100%; border: none; padding: 0;">`;
+            newTh.innerHTML = `<input type="text" placeholder="Criteria ${criteriaCount}">`;
             rubricTable.tHead.rows[0].appendChild(newTh);
 
-            const weightCell = document.createElement('td');
-            weightCell.innerHTML = `<input type="text" placeholder="Weight (% or Points)">`;
-            weightRow.appendChild(weightCell);
+            const newWeightTd = document.createElement('td');
+            newWeightTd.innerHTML = `<input type="text" placeholder="Weight (% or pts)">`;
+            document.getElementById('weight-row').appendChild(newWeightTd);
 
-            for (let i = 0; i < rubricBody.rows.length; i++) {
-                if (rubricBody.rows[i].id !== 'weight-row') {
-                    rubricBody.rows[i].appendChild(document.createElement('td'));
+            Array.from(rubricTable.tBodies[0].rows).forEach(row => {
+                if (row.id !== 'weight-row') {
+                    const newTd = document.createElement('td');
+                    newTd.innerHTML = `<input type="text" placeholder="Level description">`;
+                    row.appendChild(newTd);
                 }
-            }
-        }
+            });
+        });
 
-        function removeCriteria() {
+        document.getElementById('remove-criteria-btn').addEventListener('click', function() {
             if (criteriaCount > 0) {
-                criteriaCount--;
                 rubricTable.tHead.rows[0].lastChild.remove();
-                weightRow.lastChild.remove();
-
-                for (let i = 0; i < rubricBody.rows.length; i++) {
-                    if (rubricBody.rows[i].id !== 'weight-row') {
-                        rubricBody.rows[i].lastChild.remove();
+                document.getElementById('weight-row').lastChild.remove();
+                Array.from(rubricTable.tBodies[0].rows).forEach(row => {
+                    if (row.id !== 'weight-row') {
+                        row.lastChild.remove();
                     }
-                }
+                });
+                criteriaCount--;
             }
-        }
+        });
 
-        function addRubricRow() {
-            const row = document.createElement('tr');
-            for (let i = 0; i <= criteriaCount; i++) {
-                const cell = document.createElement('td');
-                cell.innerHTML = `<input type="text" placeholder="Level description">`;
-                row.appendChild(cell);
+        document.getElementById('add-row-btn').addEventListener('click', function() {
+            const newRow = document.createElement('tr');
+            newRow.innerHTML = `<td><input type="text" placeholder="Proficiency Level"></td>`;
+            for (let i = 0; i < criteriaCount; i++) {
+                newRow.innerHTML += `<td><input type="text" placeholder="Level description"></td>`;
             }
-            rubricBody.insertBefore(row, weightRow);
-        }
+            rubricTable.tBodies[0].appendChild(newRow);
+        });
 
-        function removeRubricRow() {
-            const rows = rubricBody.querySelectorAll('tr');
-            for (let i = 0; i < rows.length; i++) {
-                if (rows[i].id !== 'weight-row') {
-                    rubricBody.removeChild(rows[i]);
-                    break;
-                }
+        document.getElementById('remove-row-btn').addEventListener('click', function() {
+            if (rubricTable.tBodies[0].rows.length > 1) {
+                rubricTable.tBodies[0].lastChild.remove();
             }
-        }
+        });
 
-        function addRow() {
+        document.getElementById('add-essay-btn').addEventListener('click', function() {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td><input type="text" placeholder="Student Name"></td>
                 <td><input type="text" placeholder="Essay"></td>
             `;
             essayBody.appendChild(row);
-        }
+        });
 
-        function removeRow() {
+        document.getElementById('remove-essay-btn').addEventListener('click', function() {
             if (essayBody.children.length > 0) {
                 essayBody.lastChild.remove();
             }
-        }
+        });
+
+        document.getElementById('submit-btn').addEventListener('click', function() {
+            const essays = Array.from(document.querySelectorAll('#essay-body tr'));
+            if (essays.length < 15) {
+                alert('Please add at least 15 essays before submitting.');
+                return;
+            }
+            
+            let selectedEssays = [];
+            while (selectedEssays.length < 8) {
+                let randomEssay = essays[Math.floor(Math.random() * essays.length)];
+                if (!selectedEssays.includes(randomEssay)) {
+                    selectedEssays.push(randomEssay);
+                }
+            }
+            
+            selectedEssays.forEach(essay => {
+                const studentName = essay.children[0].querySelector('input').value;
+                const essayText = essay.children[1].querySelector('input').value;
+                
+                let popup = window.open("", "_blank", "width=600,height=400");
+                popup.document.write(`<h2>Grading: ${studentName}</h2>`);
+                popup.document.write(`<p><strong>Essay:</strong> ${essayText}</p>`);
+                popup.document.write(`<label>Final Grade: <input type='text' id='final-grade'></label><br>`);
+                
+                for (let i = 1; i <= criteriaCount; i++) {
+                    popup.document.write(`<label>Criteria ${i}: <input type='text' id='criteria-${i}'></label><br>`);
+                }
+                popup.document.write(`<label>Feedback: <textarea id='feedback'></textarea></label><br>`);
+                popup.document.write(`<button onclick='window.close()'>Save & Close</button>`);
+            });
+
+            // Later: Send essays and rubric data to Groq AI for automated grading
+        });
     </script>
 </body>
 </html>
