@@ -322,15 +322,16 @@ async function logGradingDifferences(essay, groqGrades) {
 
     console.log(`User Overall Grade:${userOverallGrade}, Groq Overall Grade:${groqGrades.overall}`);
 
-    if (userSubgrades.length > 0) {
-        for (let i = 0; i < userSubgrades.length; i++) {
+    for (let i = 0; i < userSubgrades.length; i++) {
 
+        if (i < groqGrades.subgrades.length) {
             console.log(`User Subgrade ${i + 1}:${userSubgrades[i]}, Groq Subgrade ${i + 1}:${groqGrades.subgrades[i]}`);
 
             console.log(`Subgrade ${i + 1} Difference:${userSubgrades[i] - groqGrades.subgrades[i]}`);
+        } else {
+            console.log(`User Subgrade ${i + 1}: N/A, Groq Subgrade ${i + 1}: N/A`);
+            console.log(`Subgrade ${i + 1} Difference: N/A`);
         }
-    } else {
-        console.log("No user subgrades entered.");
     }
 
     console.log(`Groq Feedback:${groqGrades.feedback}`);
