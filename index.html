@@ -290,11 +290,11 @@
     }
 async function logGradingResults() {
     console.log("\nFinal Grading Results:");
-
-    // Iterate over each user's grades and log them along with Groq's grades
-    for (const [index, userGrade] of userGrades.entries()) {
-        // Assuming getGroqGradesForEssay is a function that fetches the Groq grades for the respective essay
-        const groqResponse = await gradeWithGroq(allEssays[index]); // Use gradeWithGroq to get grades
+    
+    // Iterate through only the user graded essays
+    for (const userGrade of userGrades) {
+        const index = allEssays.findIndex(essay => essay.children[0].querySelector('input').value === userGrade.name);
+        const groqResponse = await gradeWithGroq(allEssays[index]); // Use gradeWithGroq to get grades from Groq
         const groqGradesArray = groqResponse.split(',').map(Number); // Convert string to array of numbers
         const groqOverall = groqGradesArray[0]; // First element is the overall grade
 
@@ -306,7 +306,7 @@ async function logGradingResults() {
         console.log(`Groq Subgrades: ${groqGradesArray.slice(1).join(", ")}`); // Skip the overall grade for subgrades
         
         userGrade.subgrades.forEach((subgrade, i) => {
-            // Ensure we don't access out of bounds
+            // Prevent accessing out of bounds
             if (i < groqGradesArray.length - 1) {
                 console.log(`Subgrade ${i + 1} User: ${subgrade}, Groq: ${groqGradesArray[i + 1]}, Difference: ${subgrade - groqGradesArray[i + 1]}`);
             } else {
@@ -315,7 +315,6 @@ async function logGradingResults() {
         });
     }
 }
-
     async function logGradingDifferences(essay) {
         const studentName = essay.children[0].querySelector('input').value;
         let userOverallGrade = document.querySelector(`#overall-grade`).value;
