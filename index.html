@@ -145,7 +145,7 @@
 <script type="module">
     import Groq from "https://cdn.jsdelivr.net/npm/groq-sdk@0.8.0/+esm";
 
-    const encodedApiKey = "Z3NrX21tTzZvWlpXMjdQbkJqTnpyWFVHV0dkeWIzRllsT0Z5TzVBYUtSbldQUGdubkZ5T1hKY2M=";
+    const encodedApiKey = "YOUR_API_KEY_HERE"; // Replace with your actual API key
     const decodedApiKey = atob(encodedApiKey);
     const client = new Groq({ apiKey: decodedApiKey, dangerouslyAllowBrowser: true });
 
@@ -268,8 +268,11 @@
             // Get all essays (user-graded and not)
             let allEssays = Array.from(document.querySelectorAll('#essay-body tbody tr'));
 
+            // Shuffle essays to pick a random selection of 8 for user grading
+            let shuffledEssays = allEssays.sort(() => 0.5 - Math.random()).slice(0, 8);
+
             // For each essay, try to get a Groq response
-            for (const essay of allEssays) {
+            for (const essay of shuffledEssays) {
                 await gradeWithGroq(essay);
                 console.log("\n");
                 console.log("Done with essay:", essay.children[0].querySelector('input').value);
@@ -278,10 +281,6 @@
                 console.log("\n");
                 console.log("Waiting for next essay...");
                 console.log("\n");
-
-                // After trying to get a Groq response for every essay, log differences between user's and Groq's grades
-                logGradingDifferences(essay);
-                // No need for break here; let it run through all essays
             }
 
             // Show a success message after all essays have been graded by Groq
@@ -304,9 +303,8 @@
             `You are an expert essay grader for grade ${document.getElementById('grade-level').value} ${document.getElementById('class-subject').value}. Here is the rubric: ${document.getElementById('rubric-table').outerHTML}. Grade the following essay:`;
 
         let userMessage =
-            `Essay by ${studentName}: ${essay.children[1].querySelector('input').value}. Use the following format (every grade should be a number out of 100):\n` +
-            `Overall Grade:\n` +
-            `${Array.from(document.querySelectorAll('.criterion-name')).map((criterion) => "0").join(", ")}`; // Initialize all subgrades with default values
+            `Essay by ${studentName}: ${essay.children[1].querySelector('input').value}. Use the following format (every grade should be a number out of 100): Comma-separated array (Overall Grade, Subgrade 1, Subgrade 2, etc)\n` +
+            `${Array.from(document.querySelectorAll('.criterion-name')).map((criterion, index) => "0").join(", ")}`; // Initialize all subgrades with default values
 
         userMessage += `\nPrompt: ${document.getElementById("prompt-input").value}`;
 
@@ -351,7 +349,7 @@
             }
         }
 
-        // If retries run out, optionally log an error
+        // If retries run out, log an error
         if (!groqGrades) {
             console.error(`Failed to receive grades for ${studentName} after multiple retries.`);
         }
@@ -366,26 +364,12 @@
         };
 
         try {
-            // The expected response format from Groq should be something like
-            // Overall Grade: x
-            // Subgrade 1: y
-            // Subgrade 2: z
-            // Feedback: ...
-            const lines = messageContent.split("\n");
-
-            groqGrades.overall = parseInt(lines[0].match(/Overall Grade:\s*(\d+)/)[1]);
-
-            // Extracting subgrades
-            for (let i = 1; i < lines.length - 1; i++) { // Skip the last line for feedback
-                const match = lines[i].match(/Subgrade \d+:\s*(\d+)/);
-                if (match) {
-                    groqGrades.subgrades.push(parseInt(match[1]));
-                }
-            }
-
-            // Assuming the last line contains feedback
-            groqGrades.feedback = lines[lines.length - 1];
-
+            // Expected response format: Overall Grade, Subgrade 1, Subgrade 2, etc.
+            const parts = messageContent.split(",").map(part => part.trim());
+            groqGrades.overall = parseInt(parts[0]);
+            groqGrades.subgrades = parts.slice(1).map(subgrade => parseInt(subgrade));
+            // Assuming feedback is somewhere in the response, adjust as necessary
+            groqGrades.feedback = "Feedback not provided"; // Placeholder for feedback
         } catch (e) {
             console.error("Failed to parse Groq response:", e);
         }
@@ -403,7 +387,7 @@
         console.log(`Grades for ${studentName}:`);
         console.log(`User Overall Grade: ${userOverallGrade}`);
 
-        const groqGrades = parseGroqResponse(''); // We won't pass anything here since it's empty; you may want to adapt this.
+        const groqGrades = parseGroqResponse('0, 0, 0'); // Placeholder to demonstrate structure
 
         console.log(`Groq Overall Grade: ${groqGrades.overall}`);
 
@@ -422,9 +406,11 @@
             return;
         }
 
-        selectedEssays = [...essays]; // Assign to the global selectedEssays array
+        // Randomly select 8 essays for grading
+        selectedEssays = essays.sort(() => 0.5 - Math.random()).slice(0, 8); 
         openGradeModal(selectedEssays.shift()); // Open for the first selected essay
     });
+    
 </script>
 </body>
 </html>
