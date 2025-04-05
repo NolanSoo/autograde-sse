@@ -160,8 +160,9 @@
     const closeModal = document.querySelector(".close");
     const gradeSubmit = document.getElementById("grade-submit");
 
-    let selectedEssays = []; // Declare selectedEssays at the top-level
+    let selectedEssays = []; // Essay in the grading modal
     let allEssays = []; // Store all essays for Groq grading
+    let userGrades = []; // Store grades inputted by the user
 
     addCriterionBtn.addEventListener('click', () => {
         const headRow = document.querySelector('#rubric-table thead tr');
@@ -247,13 +248,16 @@
 
     gradeSubmit.addEventListener('click', async () => {
         const studentName = studentNameInput.value;
-        const overallGrade = overallGradeInput.value;
-        const subgrades = Array.from(subgradesContainer.querySelectorAll('.subgrade-input')).map(input => input.value);
+        const overallGrade = parseInt(overallGradeInput.value);
+        const subgrades = Array.from(subgradesContainer.querySelectorAll('.subgrade-input')).map(input => parseInt(input.value));
 
         console.log(`Overall Grade for ${studentName}: ${overallGrade}`);
         subgrades.forEach((subgrade, index) => {
             console.log(`Subgrade ${index + 1} for ${studentName}: ${subgrade}`);
         });
+
+        // Save user grades
+        userGrades.push({ name: studentName, overall: overallGrade, subgrades: subgrades });
 
         // Close the modal
         gradeModal.style.display = "none";
@@ -263,7 +267,6 @@
             const nextEssay = selectedEssays.shift(); // Pop the next essay from the list
             openGradeModal(nextEssay); // Open for the next essay
         } else {
-            // All user essays graded, log Groq grading results
             console.log("Groq will grade all essays now.");
             await gradeAllEssays(); // Grade all essays in sequence
             await logGradingResults(); // Log grading results after Groq grading is complete
@@ -287,13 +290,21 @@
 
     async function logGradingResults() {
         console.log("\nFinal Grading Results:");
-        for (const essay of allEssays) {
-            // Assume groqGrades is already defined based on previous logGradingDifferences calls.
-            const groqGrades = await logGradingDifferences(essay);
-            console.log(`Grades for ${essay.children[0].querySelector('input').value}:`);
-            console.log(`Groq Overall Grade: ${groqGrades.overall}`);
-            console.log(`Groq Subgrades: ${groqGrades.subgrades.join(", ")}`);
-        }
+        userGrades.forEach((userGrade, index) => {
+            const groqResponse = await getGroqGradesForEssay(allEssays[index]); // Get the associated Groq grades
+            const groqGradesArray = groqResponse.split(',').map(Number); // Convert the comma-separated string to an array of numbers
+            const groqOverall = groqGradesArray[0]; // First element is the overall grade
+
+            console.log(`Grades for ${userGrade.name}:`);
+            console.log(`User Overall Grade: ${userGrade.overall}`);
+            console.log(`Groq Overall Grade: ${groqOverall}`);
+            console.log(`User Subgrades: ${userGrade.subgrades.join(", ")}`);
+            console.log(`Groq Subgrades: ${groqGradesArray.slice(1).join(", ")}`); // Skip the overall grade for subgrades
+            
+            userGrade.subgrades.forEach((subgrade, i) => {
+                console.log(`Subgrade ${i + 1} User: ${subgrade}, Groq: ${groqGradesArray[i + 1]}, Difference: ${subgrade - groqGradesArray[i + 1]}`);
+            });
+        });
     }
 
     async function logGradingDifferences(essay) {
@@ -304,20 +315,17 @@
 
         console.log(`\nGrades for ${studentName}:`);
         console.log(`User Overall Grade: ${userOverallGrade}`);
-
-        // Split Groq's grades if needed
-        let groqResponse = await getGroqGradesForEssay(essay);
-        let groqGradesArray = groqResponse.split(',').map(Number); // Convert the comma-separated string to an array of numbers
         
+        let groqResponse = await gradeWithGroq(essay);
+        let groqGradesArray = groqResponse.split(',').map(Number); // Convert the comma-separated string to an array of numbers
         let groqOverall = groqGradesArray[0]; // First element is the overall grade
-        let groqSubgrades = groqGradesArray.slice(1); // The rest are subgrades
-
+        
         console.log(`Groq Overall Grade: ${groqOverall}`);
 
         for (let i = 0; i < userSubgrades.length; i++) {
-            if (i < groqSubgrades.length) {
-                console.log(`User Subgrade ${i + 1}: ${userSubgrades[i]}, Groq Subgrade ${i + 1}: ${groqSubgrades[i]}`);
-                console.log(`Subgrade ${i + 1} Difference: ${userSubgrades[i] - groqSubgrades[i]}`);
+            if (i < groqGradesArray.length - 1) {
+                console.log(`User Subgrade ${i + 1}: ${userSubgrades[i]}, Groq Subgrade ${i + 1}: ${groqGradesArray[i + 1]}`);
+                console.log(`Subgrade ${i + 1} Difference: ${userSubgrades[i] - groqGradesArray[i + 1]}`);
             } else {
                 console.log(`User Subgrade ${i + 1}: ${userSubgrades[i]}, Groq Subgrade ${i + 1}: N/A`);
                 console.log(`Subgrade ${i + 1} Difference: N/A`);
@@ -326,7 +334,7 @@
 
         return {
             overall: groqOverall,
-            subgrades: groqSubgrades
+            subgrades: groqGradesArray.slice(1)
         };
     }
 
@@ -354,7 +362,7 @@
                 let chatCompletion = await client.chat.completions.create(params);
                 let messageContent = chatCompletion.choices[0].message.content;
                 console.log("Received grades from Groq for", studentName, ":", messageContent);
-                return messageContent; // Return the raw response for parsing later
+                return messageContent; // Return the raw response for further handling
             } catch (err) {
                 if (err.message.includes("429") && retries > 0) {
                     console.warn("Rate limit exceeded. Retrying...");
