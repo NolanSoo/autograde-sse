@@ -347,7 +347,7 @@ async function logGradingDifferences(essay, groqGrades) {
         `Essay by ${studentName}: ${essay.children[1].querySelector('input').value}. Use the following format (every grade should be a number out of 100): Comma-separated array (Overall Grade, Subgrade 1, Subgrade 2, etc)\n` +
         `${Array.from(document.querySelectorAll('.criterion-name')).map((criterion, index) => "0").join(", ")}`; // Initialize all subgrades with default values
 
-    userMessage += `\nPrompt: ${document.getElementById("prompt-input").value}`;
+    userMessage += `\nPrompt: ${document.getElementById("prompt-input").value}. Finally, the message should look exactly like this (NOTHING ELSE, NOT EVEN PARANTHESES OR WRITTEN FEEDBACK - ONLY NUMERICAL VALUES): <overall grade>, <subgrade 1>, <continues for all subgrades>`;
 
     let params =
         {
