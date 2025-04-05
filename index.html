@@ -308,6 +308,7 @@
     }
 }
 
+
 async function logGradingDifferences(essay, groqGrades) {
     const studentName = essay.children[0].querySelector('input').value;
 
@@ -321,12 +322,15 @@ async function logGradingDifferences(essay, groqGrades) {
 
     console.log(`User Overall Grade:${userOverallGrade}, Groq Overall Grade:${groqGrades.overall}`);
 
-    for (let i = 0; i < userSubgrades.length; i++) {
+    if (userSubgrades.length > 0) {
+        for (let i = 0; i < userSubgrades.length; i++) {
 
-        console.log(`User Subgrade ${i + 1}:${userSubgrades[i]}, Groq Subgrade ${i + 1}:${groqGrades.subgrades[i]}`);
+            console.log(`User Subgrade ${i + 1}:${userSubgrades[i]}, Groq Subgrade ${i + 1}:${groqGrades.subgrades[i]}`);
 
-        console.log(`Subgrade ${i + 1} Difference:${userSubgrades[i] - groqGrades.subgrades[i]}`);
-
+            console.log(`Subgrade ${i + 1} Difference:${userSubgrades[i] - groqGrades.subgrades[i]}`);
+        }
+    } else {
+        console.log("No user subgrades entered.");
     }
 
     console.log(`Groq Feedback:${groqGrades.feedback}`);
