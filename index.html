@@ -287,25 +287,33 @@
         alert("Groq has graded all essays.");
         console.log("Groq has successfully graded all essays.");
     }
+async function logGradingResults() {
+    console.log("\nFinal Grading Results:");
 
-    async function logGradingResults() {
-        console.log("\nFinal Grading Results:");
-        userGrades.forEach((userGrade, index) => {
-            const groqResponse = await getGroqGradesForEssay(allEssays[index]); // Get the associated Groq grades
-            const groqGradesArray = groqResponse.split(',').map(Number); // Convert the comma-separated string to an array of numbers
-            const groqOverall = groqGradesArray[0]; // First element is the overall grade
+    // Iterate over each user's grades and log them along with Groq's grades
+    for (const [index, userGrade] of userGrades.entries()) {
+        // Assuming getGroqGradesForEssay is a function that fetches the Groq grades for the respective essay
+        const groqResponse = await gradeWithGroq(allEssays[index]); // Use gradeWithGroq to get grades
+        const groqGradesArray = groqResponse.split(',').map(Number); // Convert string to array of numbers
+        const groqOverall = groqGradesArray[0]; // First element is the overall grade
 
-            console.log(`Grades for ${userGrade.name}:`);
-            console.log(`User Overall Grade: ${userGrade.overall}`);
-            console.log(`Groq Overall Grade: ${groqOverall}`);
-            console.log(`User Subgrades: ${userGrade.subgrades.join(", ")}`);
-            console.log(`Groq Subgrades: ${groqGradesArray.slice(1).join(", ")}`); // Skip the overall grade for subgrades
-            
-            userGrade.subgrades.forEach((subgrade, i) => {
+        // Log the grading results
+        console.log(`Grades for ${userGrade.name}:`);
+        console.log(`User Overall Grade: ${userGrade.overall}`);
+        console.log(`Groq Overall Grade: ${groqOverall}`);
+        console.log(`User Subgrades: ${userGrade.subgrades.join(", ")}`);
+        console.log(`Groq Subgrades: ${groqGradesArray.slice(1).join(", ")}`); // Skip the overall grade for subgrades
+        
+        userGrade.subgrades.forEach((subgrade, i) => {
+            // Ensure we don't access out of bounds
+            if (i < groqGradesArray.length - 1) {
                 console.log(`Subgrade ${i + 1} User: ${subgrade}, Groq: ${groqGradesArray[i + 1]}, Difference: ${subgrade - groqGradesArray[i + 1]}`);
-            });
+            } else {
+                console.log(`Subgrade ${i + 1} User: ${subgrade}, Groq: N/A, Difference: N/A`);
+            }
         });
     }
+}
 
     async function logGradingDifferences(essay) {
         const studentName = essay.children[0].querySelector('input').value;
