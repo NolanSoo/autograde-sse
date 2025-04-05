@@ -127,7 +127,7 @@
 <!-- Modal for grading essays -->
 <div id="gradeModal" class="modal">
     <div class="modal-content">
-        <span class="close">&times;</span>
+        <span class="close">×</span>
         <h3>Grade Essay</h3>
         <label for="student-name">Student Name:</label>
         <input type="text" id="student-name" disabled>
@@ -263,125 +263,216 @@
             openGradeModal(nextEssay); // Open for the next essay
         } else {
             // All user essays graded, log Groq grading results
-            const promptInput = document.getElementById("prompt-input").value;
-            await gradeWithGroq(promptInput, overallGrade, subgrades);
-        }
-    });
+            console.log("Groq will grade all essays now.");
 
-    async function gradeWithGroq(promptInput, userOverallGrade, userSubgrades) {
-        const gradeLevel = document.getElementById('grade-level').value;
-        const subject = document.getElementById('class-subject').value;
-        const rubricInput = document.getElementById('rubric-table').outerHTML;
-        const essays = Array.from(document.querySelectorAll('#essay-body tbody tr'));
+            // Get all essays (user-graded and not)
+            let allEssays = Array.from(document.querySelectorAll('#essay-body tbody tr'));
 
-        for (const essay of essays) {
-            const studentName = essay.children[0].querySelector('input').value;
-            const essayText = essay.children[1].querySelector('input').value;
+            // For each essay, try to get a Groq response
+            for (const essay of allEssays) {
+                await gradeWithGroq(essay);
+                console.log("\n");
+                console.log("Done with essay:", essay.children[0].querySelector('input').value);
+                console.log("\n");
+                await new Promise(resolve => setTimeout(resolve, 200)); // Add a small delay between essays
+                console.log("\n");
+                console.log("Waiting for next essay...");
+                console.log("\n");
 
-            let systemMessage = `You are an expert essay grader for grade ${gradeLevel} ${subject}. Here is the rubric: ${rubricInput}. Grade the following essay:`;
-            let userMessage = `Essay by ${studentName}: ${essayText}. Use the following format:\n`;
-            userMessage += `Overall Grade: {grade} + {feedback}\n`;
-            const criteria = Array.from(document.querySelectorAll('.criterion-name'));
-            criteria.forEach((criterion, index) => {
-                userMessage += `Subgrade ${index + 1}: ${criterion.value} + {grade} + {feedback}\n`;
-            });
-            userMessage += `Conciseness + {grade} + {feedback}\nConventions + {grade} + {feedback}\nDetail + {grade} + {feedback}\nDescriptions + {grade} + {feedback}`;
-            userMessage += `\nPrompt: ${promptInput}`;
-
-            const params = {
-                messages: [
-                    { role: "system", content: systemMessage },
-                    { role: "user", content: userMessage }
-                ],
-                model: "llama3-8b-8192"
-            };
-
-            // Retry logic for Groq requests to handle rate limits
-            let retries = 3;
-            let groqGrades;
-            while (retries > 0) {
-                try {
-                    console.log(`Sending request for ${studentName} with message:`, userMessage);
-                    const chatCompletion = await client.chat.completions.create(params);
-                    const messageContent = chatCompletion.choices[0].message.content;
-
-                    // Log Groq's grades and feedback
-                    console.log("Received feedback from Groq for", studentName, ":", messageContent);
-
-                    // Extract the grades from the response
-                    groqGrades = extractGroqGrades(messageContent);
-
-                    // Log the grades comparison
-                    logGradingDetails(userOverallGrade, userSubgrades, groqGrades, studentName);
-                    break; // Break out of retry loop on success
-                } catch (err) {
-                    if (err.message.includes("429") && retries > 0) {
-                        console.warn("Rate limit exceeded. Retrying...");
-                        retries--;
-                        const backoffTime = 2500; // Wait time before retrying
-                        await new Promise(resolve => setTimeout(resolve, backoffTime));
-                    } else {
-                        console.error("Error getting feedback for", studentName, ":", err);
-                        break; // Exit the retry loop if it's not a rate limit error
-                    }
-                }
+                // After trying to get a Groq response for every essay, log differences between user's and Groq's grades
+                logGradingDifferences();
+                break; // Exit after logging differences
             }
 
-            // If retries run out, optionally log an error
-            if (!groqGrades) {
-                console.error(`Failed to receive grades for ${studentName} after multiple retries.`);
-            }
-        }
-    }
+            // Show a success message after all essays have been graded by Groq
+            alert("Groq has graded all essays.");
 
-    function extractGroqGrades(messageContent) {
-        // Assuming the format returned looks like this:
-        // {
-        //   "overall": 8,
-        //   "subgrades": [7, 6]
-        //   "feedback": "..."
-        // }
-        
-        // This should ideally reflect how you expect the output from Groq
-        let groqGrades = {
-            overall: 0,
-            subgrades: [],
-            feedback: ""
-        };
+            // Log a success message
+            console.log("\n");
+            console.log("Groq has successfully graded all essays.");
+            console.log("\n");
 
-        // Parse the returned messageContent to extract grades
-        try {
-            const response = JSON.parse(messageContent); // Adjust based on actual response format
-            groqGrades.overall = response.overall;
-            groqGrades.subgrades = response.subgrades;
-            groqGrades.feedback = response.feedback;
-        } catch (e) {
-            console.error("Failed to parse Groq response:", e);
-        }
-        
-        return groqGrades;
-    }
+            // Log a message about how to view grades
+            console.log("You can view your grades in the output tab.");
 
-    function logGradingDetails(userOverallGrade, userSubgrades, groqGrades, studentName) {
-        console.log(`Grades for ${studentName}:`);
-        console.log(`User Overall Grade: ${userOverallGrade}, Groq Overall Grade: ${groqGrades.overall}`);
-        for (let i = 0; i < userSubgrades.length; i++) {
-            console.log(`User Subgrade ${i + 1}: ${userSubgrades[i]}, Groq Subgrade ${i + 1}: ${groqGrades.subgrades[i]}`);
-            console.log(`Subgrade ${i + 1} Difference: ${userSubgrades[i] - groqGrades.subgrades[i]}`);
-        }
-        console.log(`Groq Feedback: ${groqGrades.feedback}`);
-    }
+          }
+      });
 
-    document.getElementById('submit-btn').addEventListener('click', async function () {
-        const essays = Array.from(document.querySelectorAll('#essay-body tbody tr'));
-        if (essays.length < 8) {
-            alert('Please add at least 8 essays before submitting.');
-            return;
-        }
+      async function gradeWithGroq(essay) {
+          const studentName = essay.children[0].querySelector('input').value;
 
-        selectedEssays = [...essays]; // Assign to the global selectedEssays array
-        openGradeModal(selectedEssays.shift()); // Open for the first selected essay
-    });
+          let systemMessage =
+              `You are an expert essay grader for grade ${document.getElementById('grade-level').value} ${document.getElementById('class-subject').value}. Here is the rubric: ${document.getElementById('rubric-table').outerHTML}. Grade the following essay:`;
+
+          let userMessage =
+              `Essay by ${studentName}: ${essay.children[1].querySelector('input').value}. Use the following format (every grade should be a number out of 100):\n` +
+              `Overall Grade:` +
+              `${Array.from(document.querySelectorAll('.criterion-name')).map((criterion, index) => criterion.value + " + {grade};").join("\n")}`;
+
+          userMessage += `\nPrompt: ${document.getElementById("prompt-input").value}`;
+
+          let params =
+              {
+                  messages:
+                      [
+                          {role:"system", content:systemMessage},
+                          {role:"user", content:userMessage}
+                      ],
+                  model:"llama3-8b-8192"
+              };
+
+          // Retry logic for Groq requests to handle rate limits
+          let retries=100;
+          let groqGrades;
+
+          while (retries > 0) {
+              try {
+
+                  console.log("Sending request for", studentName, "with message:", userMessage);
+                  let chatCompletion=await client.chat.completions.create(params);
+
+                  let messageContent=chatCompletion.choices[0].message.content;
+
+                  console.log("Received feedback from Groq for", studentName, ":", messageContent);
+
+                  groqGrades=parseGroqResponse(messageContent);
+
+                  break; // Exit retry loop on success
+
+              } catch (err) {
+                  if (err.message.includes("429") && retries > 0) {
+
+                      console.warn("Rate limit exceeded. Retrying...");
+
+                      retries--;
+
+                      let backoffTime=2500; // Wait time before retrying
+
+                      await new Promise(resolve=>setTimeout(resolve, backoffTime));
+
+                  } else {
+
+                      console.error("Error getting feedback for", studentName,":",err);
+
+                      break; // Exit retry loop if it's not a rate limit error
+                  }
+              }
+          }
+
+          // If retries run out, optionally log an error
+          if (!groqGrades) {
+
+              console.error(`Failed to receive grades for ${studentName} after multiple retries.`);
+          }
+      }
+
+      function parseGroqResponse(messageContent) {
+
+          // Assuming the format returned looks like this:
+          // Overall Grade:
+          // Excellent + {grade}
+          // Good + {grade}
+          // Needs Improvement + {grade}
+          //
+          // Feedback:
+          // ...
+          //
+          // Prompt:
+          // ...
+
+          let groqGrades={
+              overall:'',
+              subgrades:[],
+              feedback:''
+          };
+
+          try {
+
+              let lines=messageContent.split('\n');
+
+              groqGrades.overall=parseInt(lines[0].match(/Overall Grade:\s*(\d+)/)[1]);
+
+              lines.slice(1).forEach((line,index)=>{
+
+                  let match=line.match(/(\w+) +\{grade\}/);
+
+                  if (match) {
+
+                      groqGrades.subgrades.push(parseInt(match[1]));
+                  }
+              });
+
+              groqGrades.feedback=lines[lines.length-3];
+
+              groqGrades.prompt=lines[lines.length-2];
+
+          } catch (e) {
+
+              console.error("Failed to parse Groq response:",e);
+          }
+
+          return groqGrades;
+
+      }
+
+      function logGradingDifferences() {
+
+          let allEssays=Array.from(document.querySelectorAll('#essay-body tbody tr'));
+
+          allEssays.forEach((essay,index)=>{
+
+              console.log("\n");
+
+              let studentName=essay.children[0].querySelector('input').value;
+
+              let userOverallGrade=document.querySelector(`#subgrade-0`).value;
+
+              let userSubgrades=Array.from(document.querySelectorAll('#subgrades-container .subgrade-input')).map(input=>input.value);
+
+              let groqGrades=parseGroqResponse('');
+
+              groqGrades.overall=parseInt(groqGrades.overall);
+
+              groqGrades.subgrades=userSubgrades.map(subgrade=>parseInt(subgrade));
+
+              console.log(`Grades for ${studentName}:`);
+
+              console.log(`User Overall Grade:${userOverallGrade}, Groq Overall Grade:${groqGrades.overall}`);
+
+              for (let i=0;i<userSubgrades.length;i++) {
+
+                  console.log(`User Subgrade ${i+1}:${userSubgrades[i]}, Groq Subgrade ${i+1}:${groqGrades.subgrades[i]}`);
+
+                  console.log(`Subgrade ${i+1} Difference:${userSubgrades[i]-groqGrades.subgrades[i]}`);
+
+              }
+
+              console.log(`Groq Feedback:${groqGrades.feedback}`);
+
+              console.log(`Groq Prompt:${groqGrades.prompt}`);
+
+              console.log("\n");
+
+          });
+      }
+
+      document.getElementById('submit-btn').addEventListener('click',async function () {
+
+          let essays=Array.from(document.querySelectorAll('#essay-body tbody tr'));
+
+          if (essays.length<8) {
+
+              alert('Please add at least 8 essays before submitting.');
+
+              return;
+
+          }
+
+          selectedEssays=[...essays]; // Assign to the global selectedEssays array
+
+          openGradeModal(selectedEssays.shift()); // Open for the first selected essay
+
+      });
 </script>
 </body>
 </html>
