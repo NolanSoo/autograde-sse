@@ -144,7 +144,8 @@
 <script type="module">
     import Groq from "https://cdn.jsdelivr.net/npm/groq-sdk@0.8.0/+esm";
 
-    const decodedApiKey = "gsk_QZhqb1xUkjlyZjkZVXIVWGdyb3FYy"; // Replace with valid API key
+      const encodedApiKey = "Z3NrX21tTzZvWlpXMjdQbkJqTnpyWFVHV0dkeWIzRllsT0Z5TzVBYUtSbldQUGdubkZ5T1hKY2M=";
+  const decodedApiKey = atob(encodedApiKey);
     const client = new Groq({ apiKey: decodedApiKey, dangerouslyAllowBrowser: true });
 
     const rubricTable = document.getElementById('rubric-table').querySelector('tbody');
