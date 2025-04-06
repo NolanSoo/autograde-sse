@@ -3,66 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <title>Essay Grader</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script> <!-- Import TensorFlow.js -->
     <style>
-        body {
-            font-family: Arial, sans-serif;
-        }
-
-        table {
-            border-collapse: collapse;
-            width: 100%;
-            margin-top: 10px;
-        }
-
-        th,
-        td {
-            border: 1px solid #ccc;
-            padding: 8px;
-        }
-
-        input[type="text"] {
-            width: 100%;
-        }
-
-        #rubric-table input {
-            width: 90%;
-        }
-
-        /* Modal styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: rgba(0, 0, 0, 0.4);
-            padding-top: 60px;
-        }
-
-        .modal-content {
-            background-color: #fefefe;
-            margin: 5% auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 80%;
-        }
-
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-        }
-
-        .close:hover,
-        .close:focus {
-            color: black;
-            text-decoration: none;
-            cursor: pointer;
-        }
+        body { font-family: Arial, sans-serif; }
+        table { border-collapse: collapse; width: 100%; margin-top: 10px;}
+        th, td { border: 1px solid #ccc; padding: 8px; }
+        input[type="text"] { width: 100%; }
+        #rubric-table input { width: 90%; }
+        .modal { display: none; position: fixed; z-index: 1; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden; background-color: rgba(0, 0, 0, 0.4); padding-top: 60px; }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 80%; }
+        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
+        .close:hover, .close:focus { color: black; text-decoration: none; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -144,8 +95,8 @@
 <script type="module">
     import Groq from "https://cdn.jsdelivr.net/npm/groq-sdk@0.8.0/+esm";
 
-      const encodedApiKey = "Z3NrX21tTzZvWlpXMjdQbkJqTnpyWFVHV0dkeWIzRllsT0Z5TzVBYUtSbldQUGdubkZ5T1hKY2M=";
-  const decodedApiKey = atob(encodedApiKey);
+    const encodedApiKey = "Z3NrX21tTzZvWlpXMjdQbkJqTnpyWFVHV0dkeWIzRllsT0Z5TzVBYUtSbldQUGdubkZ5T1hKY2M=";
+    const decodedApiKey = atob(encodedApiKey);
     const client = new Groq({ apiKey: decodedApiKey, dangerouslyAllowBrowser: true });
 
     const rubricTable = document.getElementById('rubric-table').querySelector('tbody');
@@ -161,9 +112,11 @@
     const closeModal = document.querySelector(".close");
     const gradeSubmit = document.getElementById("grade-submit");
 
-    let selectedEssays = []; // Essay in the grading modal
+    let selectedEssays = []; // Essays in the grading modal
     let allEssays = []; // Store all essays for Groq grading
     let userGrades = []; // Store grades inputted by the user
+    let finalModel = null; // To store the final model for main grade predictions
+    let curveModel = null; // To store the model that predicts the curve
 
     addCriterionBtn.addEventListener('click', () => {
         const headRow = document.querySelector('#rubric-table thead tr');
@@ -258,7 +211,7 @@
         });
 
         // Save user grades
-        userGrades.push({ name: studentName, overall: overallGrade, subgrades: subgrades });
+        userGrades.push({ name: studentName, overall: overallGrade, subgrades });
 
         // Close the modal
         gradeModal.style.display = "none";
@@ -272,11 +225,11 @@
             await gradeAllEssays(); // Grade all essays in sequence
             await logGradingResults(); // Log grading results after Groq grading is complete
             alert("Grading complete.");
+            await trainModel(); // Train the model after grading is complete
         }
     });
 
     async function gradeAllEssays() {
-        // For each essay, try to get a Groq response
         for (const essay of allEssays) {
             await gradeWithGroq(essay);
             console.log("\nDone with essay:", essay.children[0].querySelector('input').value);
@@ -284,66 +237,90 @@
             console.log("Waiting for next essay...\n");
         }
 
-        // Show a success message after all essays have been graded by Groq
         alert("Groq has graded all essays.");
         console.log("Groq has successfully graded all essays.");
     }
-async function logGradingResults() {
-    console.log("\nFinal Grading Results:");
-    
-    // Iterate through only the user graded essays
-    for (const userGrade of userGrades) {
-        const index = allEssays.findIndex(essay => essay.children[0].querySelector('input').value === userGrade.name);
-        const groqResponse = await gradeWithGroq(allEssays[index]); // Use gradeWithGroq to get grades from Groq
-        const groqGradesArray = groqResponse.split(',').map(Number); // Convert string to array of numbers
-        const groqOverall = groqGradesArray[0]; // First element is the overall grade
 
-        // Log the grading results
-        console.log(`Grades for ${userGrade.name}:`);
-        console.log(`User Overall Grade: ${userGrade.overall}`);
-        console.log(`Groq Overall Grade: ${groqOverall}`);
-        console.log(`User Subgrades: ${userGrade.subgrades.join(", ")}`);
-        console.log(`Groq Subgrades: ${groqGradesArray.slice(1).join(", ")}`); // Skip the overall grade for subgrades
+    async function logGradingResults() {
+        console.log("\nFinal Grading Results:");
         
-        userGrade.subgrades.forEach((subgrade, i) => {
-            // Prevent accessing out of bounds
-            if (i < groqGradesArray.length - 1) {
-                console.log(`Subgrade ${i + 1} User: ${subgrade}, Groq: ${groqGradesArray[i + 1]}, Difference: ${subgrade - groqGradesArray[i + 1]}`);
-            } else {
-                console.log(`Subgrade ${i + 1} User: ${subgrade}, Groq: N/A, Difference: N/A`);
-            }
-        });
+        for (const userGrade of userGrades) {
+            const index = allEssays.findIndex(essay => essay.children[0].querySelector('input').value === userGrade.name);
+            const groqResponse = await gradeWithGroq(allEssays[index]);
+            const groqGradesArray = groqResponse.split(',').map(Number);
+            const groqOverall = groqGradesArray[0];
+
+            // Predict the curve using the trained model
+            const essayTensor = preprocessText([userGrade.name]);
+            const predictedCurve = await finalModel.predict(essayTensor).data(); // Now this is using the main grade model
+            const finalGrade = groqOverall * predictedCurve[0]; // Calculate final grade using the curve
+
+            // Log the grading results
+            console.log(`Grades for ${userGrade.name}:`);
+            console.log(`User Overall Grade: ${userGrade.overall}`);
+            console.log(`Groq Overall Grade: ${groqOverall}`);
+            console.log(`Predicted Curve: ${predictedCurve[0].toFixed(2)}`);
+            console.log(`Calculated Final Grade: ${finalGrade.toFixed(2)}`);
+            console.log(`User Subgrades: ${userGrade.subgrades.join(", ")}`);
+            console.log(`Groq Subgrades: ${groqGradesArray.slice(1).join(", ")}`); 
+            
+            userGrade.subgrades.forEach((subgrade, i) => {
+                if (i < groqGradesArray.length - 1) {
+                    console.log(`Subgrade ${i + 1} User: ${subgrade}, Groq: ${groqGradesArray[i + 1]}, Difference: ${subgrade - groqGradesArray[i + 1]}`);
+                } else {
+                    console.log(`Subgrade ${i + 1} User: ${subgrade}, Groq: N/A, Difference: N/A`);
+                }
+            });
+        }
     }
-}
-    async function logGradingDifferences(essay) {
-        const studentName = essay.children[0].querySelector('input').value;
-        let userOverallGrade = document.querySelector(`#overall-grade`).value;
 
-        let userSubgrades = Array.from(subgradesContainer.querySelectorAll('.subgrade-input')).map(input => input.value);
+    async function trainModel() {
+        console.log("Training model...");
 
-        console.log(`\nGrades for ${studentName}:`);
-        console.log(`User Overall Grade: ${userOverallGrade}`);
-        
-        let groqResponse = await gradeWithGroq(essay);
-        let groqGradesArray = groqResponse.split(',').map(Number); // Convert the comma-separated string to an array of numbers
-        let groqOverall = groqGradesArray[0]; // First element is the overall grade
-        
-        console.log(`Groq Overall Grade: ${groqOverall}`);
+        const curveInputEssays = [];
+        const curveTargets = [];
 
-        for (let i = 0; i < userSubgrades.length; i++) {
-            if (i < groqGradesArray.length - 1) {
-                console.log(`User Subgrade ${i + 1}: ${userSubgrades[i]}, Groq Subgrade ${i + 1}: ${groqGradesArray[i + 1]}`);
-                console.log(`Subgrade ${i + 1} Difference: ${userSubgrades[i] - groqGradesArray[i + 1]}`);
-            } else {
-                console.log(`User Subgrade ${i + 1}: ${userSubgrades[i]}, Groq Subgrade ${i + 1}: N/A`);
-                console.log(`Subgrade ${i + 1} Difference: N/A`);
+        // Collect data for curves (ratio of user grade to Groq grade)
+        for (let i = 0; i < userGrades.length; i++) {
+            const userGrade = userGrades[i].overall;
+            const essay = allEssays[i];
+            const groqResponse = await gradeWithGroq(essay);
+            const groqGradesArray = groqResponse.split(',').map(Number);
+            const groqOverall = groqGradesArray[0];
+
+            // Prevent division by zero and calculate the curve
+            if (groqOverall > 0) {
+                const curve = userGrade / groqOverall;
+                curveInputEssays.push(essay.children[0].querySelector('input').value);
+                curveTargets.push(curve);
             }
         }
 
-        return {
-            overall: groqOverall,
-            subgrades: groqGradesArray.slice(1)
-        };
+        const curveInputTensor = preprocessText(curveInputEssays);
+        const curveTargetTensor = tf.tensor1d(curveTargets);
+
+        // Build and train the model for curve prediction
+        const curveModel = tf.sequential();
+        curveModel.add(tf.layers.dense({ inputShape: [1200], units: 1 }));
+        curveModel.compile({ optimizer: 'adam', loss: 'meanSquaredError' });
+
+        await curveModel.fit(curveInputTensor, curveTargetTensor, { epochs: 1000 });
+
+        console.log("Curve model training completed!");
+        window.curveModel = curveModel; // Store the trained model
+    }
+
+    function preprocessText(essays) {
+        const tokenizedInputs = essays.map(essay => {
+            const words = essay.trim().split(/\s+/);
+            const vector = new Array(1200).fill(0);
+            words.forEach(word => {
+                const index = Math.min(word.length, 1199);
+                vector[index] += 1;
+            });
+            return vector;
+        });
+        return tf.tensor2d(tokenizedInputs);
     }
 
     async function gradeWithGroq(essay) {
@@ -361,7 +338,6 @@ async function logGradingResults() {
             model: "llama3-8b-8192"
         };
 
-        // Retry logic for Groq requests to handle rate limits
         let retries = 100;
 
         while (retries > 0) {
