@@ -143,7 +143,7 @@
 
 <script type="module">
     import Groq from "https://cdn.jsdelivr.net/npm/groq-sdk@0.8.0/+esm";
-    import tf from 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/+esm';
+    import * as tf from '@tensorflow/tfjs';
 
     const encodedApiKey = "Z3NrX21tTzZvWlpXMjdQbkJqTnpyWFVHV0dkeWIzRllsT0Z5TzVBYUtSbldQUGdubkZ5T1hKY2M=";
     const decodedApiKey = atob(encodedApiKey);
